@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+  $(document).ready(function() {
+    $('#projectsTable').DataTable();
+
+  } );
+
+  function submitProjectForm(obj){
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         projectId = data[1];
+
+      }
+
+    $("#projectForm").attr("action","/chronux/listFiles/");
+
+    $("#projectId").val(projectId);
+
+    $("#projectForm").submit();
+  }
+
+  function submitAddProject(obj){
+
+    $("#projectForm").attr("action","/chronux/addProject/");
+
+    $("#projectForm").submit();
+  }
+
+  function submitDisplayNewProjects(obj){
+
+    $("#projectForm").attr("action","/chronux/displayNewProjects/");
+
+    $("#projectForm").submit();
+  }
+  
+  function submitProjectDelete(obj){
+
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         projectId = data[1];
+
+      }
+      
+    if (confirm("Are you sure you want to delete the project?")){  
+
+      $("#projectForm").attr("action","/chronux/deleteProject/");
+  
+      $("#projectId").val(projectId);
+  
+      $("#projectForm").submit();
+    
+    }
+  }  
+  
+  function submitProjectAnalyze(obj){
+
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         projectId = data[1];
+
+      }
+
+      $("#projectForm").attr("action","/chronux/analyzeProject/");
+  
+      $("#projectId").val(projectId);
+  
+      $("#projectForm").submit();
+
+  }    
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+
+<!-- /.row -->
+<div class="row">
+  <div class="col-lg-12">
+    <h1 class="page-header">Projects</h1>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /.row -->
+<form method = "post" id = "projectForm" name = "projectForm" action="/chronux/listFiles/">
+ {% csrf_token %} 
+ <input type="hidden" value="" name="projectId" id ="projectId"/>
+ <p>
+  {% if messages %}
+    <ul class="messages">
+    {% for message in messages %}
+      <li{% if message.tags %} class="{{ message.tags }}"{% endif %}><font color="red">{{ message }}</font></li>
+    {% endfor %}
+    </ul>
+  {% endif %} 
+ </p>
+ <div class="row">
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#listProjectsPanel">
+		Projects list. (Click to toggle this panel.)
+	    </a>
+	  </h4>       
+      </div>
+      <!-- /.panel-heading -->
+      <div id="listProjectsPanel" class="panel-collapse collapse in" style="overflow-y:auto;height:300px;" -webkit-scrollbar>         
+      <div class="panel-body" >
+        <p>
+	  Please cick on files to see the related data files for the project. If you click on analyze, you will by default start the analysis on the first data file uploaded for this project. A project could have multiple data files added to it. 
+	</p>
+        <div class="table-responsive" >
+	  <table id="projectsTable" class="display" cellspacing="0" width="100%">
+	   <thead>
+	      <tr >
+		<th>Name</th>
+		<th>User</th>	
+		<th>Files</th>	
+		<th>Analyze</th>			
+		<th>Delete</th>	
+              </tr>
+           </thead>
+           <tbody>
+           {% for projectObj in projectObjList %}
+             <tr>
+               <td> {{ projectObj.project.name }}  </td>
+               <td>{{ projectObj.project.user }}</td>
+               <td><button type="button" class="btn btn-primary" id = "projectButton-{{projectObj.project.id}}" name = "projectButton-{{projectObj.project.id}}" onclick ="javascript:submitProjectForm(this);">Files </button></td>
+               <td><button type="button" class="btn btn-primary" id = "projectButton-{{projectObj.project.id}}" name = "projectButton-{{projectObj.project.id}}" onclick ="javascript:submitProjectAnalyze(this);" {% if projectObj.numContrastMatrixFiles == 0 %} disabled {
+	       {% endif %}>Analyze </button></td>
+               <td><button type="button" class="btn btn-warning" id = "projectDeleteButton-{{projectObj.project.id}}" name = "projectDeleteButton-{{projectObj.project.id}}" onclick ="javascript:submitProjectDelete(this);" >Delete </button></td>
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+      </div>
+      <!-- /.panel-body -->
+      </div>
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+ </div>
+ <!-- /.row -->
+ <p class="text-center">
+
+  <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "submitButton" id="submitButton-0" onclick ="javascript:submitAddProject(this);">Add Project</button>&nbsp;&nbsp;&nbsp;
+  <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "submitButton" id="submitButton-0" onclick ="javascript:submitDisplayNewProjects(this);" >Import Projects</button>&nbsp;&nbsp;&nbsp;
+
+ </p>  
+</form>
+{% endblock content %}

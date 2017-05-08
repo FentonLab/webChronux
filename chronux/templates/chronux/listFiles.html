@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+  $(document).ready(function() {
+    $('#dataFileTable').DataTable();
+
+  } );
+
+  function submitAddDataFileForm(obj){
+
+    $("#dataFileForm").attr("action","/chronux/addDataFile/");
+
+    $("#dataFileForm").submit();
+  }
+
+  function submitDataFileForm(obj){
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         dataFileId = data[1];
+
+      }
+
+    $("#dataFileId").val(dataFileId);
+
+    $("#dataFileForm").submit();
+  }
+
+  function submitDataFileForm(obj){
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         dataFileId = data[1];
+
+      }
+      
+    $("#dataFileForm").attr("action","/chronux/displayFileDetails/");      
+
+    $("#dataFileId").val(dataFileId);
+
+    $("#dataFileForm").submit();
+  }
+  
+  function submitAnalyzeDataFileForm(obj){
+  
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         dataFileId = data[1];
+
+      }
+
+    $("#dataFileId").val(dataFileId);
+
+    $("#dataFileForm").attr("action","/chronux/analyzeFileSelect/");
+
+    $("#dataFileForm").submit();
+  }
+  
+  function submitDeleteFiles(obj){
+  
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         dataFileId = data[1];
+
+      }
+
+    $("#dataFileId").val(dataFileId);
+
+    if(confirm('Please confirm if you would like to delete this file. Deleting the counts matrix file will delete associated qc files and any results of past analysis on the file.')){
+
+      $("#dataFileForm").attr("action","/chronux/deleteProjectFiles/");
+  
+      $("#dataFileForm").submit();
+    }
+  }
+  
+  function submitDataFileHandlerForm(obj){
+   
+      objId = obj.id;
+
+      data = objId.split("-");
+      
+      dataValue = "";
+
+      if (data.length > 0){
+
+         dataValue = data[1];
+
+      }
+
+    if (dataValue == "0" ){
+    
+      $("#dataFileForm").attr("action","/chronux/listProjects/");
+    
+    }
+    else  if (dataValue == "1" ){
+
+      $("#dataFileForm").attr("action","/chronux/addDataFile/");
+    
+    }
+
+    $("#dataFileForm").submit();
+  }  
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+
+<!-- /.row -->
+<div class="row">
+  <div class="col-lg-12">
+    <h1 class="page-header">Files for project {{project.name}}</h1>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /.row -->
+<form method = "post" id = "dataFileForm" name = "dataFileForm" action="/chronux/displayFileDetails/">
+ {% csrf_token %} 
+ <input type="hidden" value="" name="dataFileId" id ="dataFileId"/>
+ <input type="hidden" value="{{project.id}}" name="projectId" id ="projectId"/>
+  <div class="row">
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        File List
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" >
+        <div class="table-responsive" >
+	  <table id="dataFileTable" class="display" cellspacing="0" width="100%">
+	   <thead>
+	      <tr >
+		<th>Name</a></th>
+		<th>Description</a></th>
+		<th>Details</a></th>	
+		<th>Delete</a></th>			
+		<th>Analyze</a></th>			
+              </tr>
+           </thead>
+           <tbody>
+           {% for dataFile in dataFiles %}
+             <tr>
+               <td> {{ dataFile.name }}  </td>
+	       <td>{{ dataFile.description }}</td>
+               <td><button type="button" class="btn btn-primary" id = "dataFileButton-{{dataFile.id}}" name = "dataFileButton-{{dataFile.id}}" onclick ="javascript:submitDataFileForm(this);">Details </button></td>
+               <td><button type="button" class="btn btn-warning" id = "dataFileButton-{{dataFile.id}}" name = "dataFileButton-{{dataFile.id}}" onclick ="javascript:submitDeleteFiles(this);">Delete</button></td>
+               <td><button type="button" class="btn btn-primary" id = "dataFileButton-{{dataFile.id}}" name = "dataFileButton-{{dataFile.id}}" onclick ="javascript:submitAnalyzeDataFileForm(this);">Analyze File</button></td>
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+      </div>
+      <!-- /.panel-body -->
+    </div>
+
+  </div>
+  <!-- /.col-lg-12 -->
+ </div>
+ 
+ <!-- /.row -->
+  <p class="text-center">
+
+   <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "submitButton" id="submitButton-0" onclick ="javascript:submitDataFileHandlerForm(this);">Back to Project List</button>&nbsp;&nbsp;&nbsp;
+   <button type="submit" class="btn btn-danger btn-lg" value = "1" name="submitButton" id="submitButton-1" onclick ="javascript:submitDataFileHandlerForm(this);">Add Data File</button>
+
+ </p> 
+</form>
+{% endblock content %}

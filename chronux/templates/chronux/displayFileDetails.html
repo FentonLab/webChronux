@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+{{ barPlotScript | safe }}
+
+<script type="text/javascript">
+
+  $(document).ready(function() {
+    $('#projectsTable').DataTable();
+
+  } );
+  
+
+  $(document).ready(function() {
+    $('#summaryDetailTable').DataTable();
+
+  } );
+
+  function submitSampleDetailForm(obj){
+  
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         sampleDetailId = data[1];
+
+      }
+
+    $("#sampleDetailId").val(sampleDetailId);
+
+    $("#sampleDetailForm").attr("action","/chronux/sampleDetail/");
+
+    $("#sampleDetailForm").submit();
+  }
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+
+<!-- /.row -->
+<div class="row">
+  <div class="col-lg-12">
+    <h1 class="page-header">Samples for project {{dataFile.project.name}}</h1>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /.row -->
+<form method = "post" id = "sampleDetailForm" name = "sampleDetailForm" action="/chronux/listFiles/">
+    {% csrf_token %} 
+ <input type="hidden" value="" name="sampleDetailId" id ="sampleDetailId"/>
+ <input type="hidden" value="{{dataFile.project.id}}" name="projectId" id ="projectId"/>
+ 
+ <div class="row">
+  <div class="col-lg-12">
+    <!-- /.panel -->
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#percentDistributionsPanel">
+	      Percentage plot. (Click to toggle this panel.)
+	    </a>
+	  </h4>       
+      </div>
+      <!-- /.panel-heading -->
+      <div id="percentDistributionsPanel" class="panel-collapse collapse in" style="overflow-y:auto;height:600px;" -webkit-scrollbar>      
+      <div class="panel-body" >
+
+			<div class="bokeh_plots">{{ barPlotDiv | safe }}</div>
+	
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->    
+  </div>
+  <!-- /.col-lg-12 -->
+ <!--</div>-->
+ <!--<!-- /.row --> -->
+ 
+ <!--<div class="row">-->
+  <div class="col-lg-12">
+    <!-- /.panel -->
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#sampleListPanel">
+	      Samples for project {{dataFile.project.name}}. (Click to toggle this panel.)
+	    </a>
+	  </h4>       
+      </div>
+      <!-- /.panel-heading -->
+      <div id="sampleListPanel" class="panel-collapse collapse in" style="overflow-y:auto;height:550px;" -webkit-scrollbar>      
+      <div class="panel-body" >
+        <div class="table-responsive" >
+	  <table id="summaryDetailTable" class="display" cellspacing="0" width="100%">
+	   <thead>
+	      <tr>
+		<th>Sample Name</th>
+		<th># Input Reads</th>
+		<th>Pct Uniquely Mapped Reads</th>	
+		<th>Pct Mapped Multiple Loci</th>	
+		<th>Pct Mapped Too Many Loci</th>	
+		<th>Pct Mapped Too Many Mismatches</th>	
+		<th>Pct Mapped Too Short</th>	
+		<th>Total Alignments</th>
+              </tr>
+           </thead>
+           <tbody>
+           {% for sampleDetail in sampleDetailList %}
+             <tr>
+		<td><a href="#" onclick = "javascript:submitSampleDetailForm(this);" name = "sampleDetail-{{sampleDetail.id}}" id = "sampleDetail-{{sampleDetail.id}}">{{sampleDetail.sampleName}}</a></td>
+		<td>{{sampleDetail.numberOfInputReads}}</td>
+		<td>{{sampleDetail.pctUniquelyMappedReads}}</td>	
+		<td>{{sampleDetail.pctMappedMultipleLoci}}</td>	
+		<td>{{sampleDetail.pctUnMappedTooManyLoci}}</td>	
+		<td>{{sampleDetail.pctUnMappedTooManyMismatches}}</td>	
+		<td>{{sampleDetail.pctUnMappedTooShort}}</td>	
+		<td>{{sampleDetail.totalAlignments}}</td>	
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+	</div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->    
+  </div>
+  <!-- /.col-lg-12 -->
+ </div>
+ <!-- /.row --> 
+ 
+ <p class="text-center">
+
+  <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "submitButton" id="submitButton-0">Back</button>
+
+ </p>   
+</form>
+{% endblock content %}

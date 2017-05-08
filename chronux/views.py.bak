@@ -1,0 +1,2534 @@
+from django.contrib.auth.decorators import login_required
+
+from django.template import RequestContext
+from django.shortcuts import render_to_response
+
+from django.http import HttpResponse
+
+from chronux.models import *
+from chronux.chronuxObjs import *
+from chronux.chronuxConstants import *
+
+import rpy2.robjects as robjects 
+from rpy2.robjects import r
+from rpy2.robjects.packages import importr 
+
+import pandas as pd
+from pandas import DataFrame
+
+import openpyxl
+import chronux.tasks as ts
+
+from seaborn import color_palette, diverging_palette
+
+from bokeh.embed import components
+from bokeh.plotting import figure, ColumnDataSource
+from bokeh.models import HoverTool, Circle, Panel, Tabs
+
+import os, sys, traceback
+
+import zipfile
+
+import StringIO
+import shutil
+
+from django.conf import settings
+import numpy
+import itertools
+import csv
+import datetime
+
+def register(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            new_user = form.save()
+            return HttpResponseRedirect("/registration/")
+    else:
+        form = UserCreationForm()
+    return render_to_response("registration/register.html", {
+        'form': form,
+    })
+
+#@login_required
+def landing(request):
+    return render_to_response("chronux/landing.html", {
+
+    },  RequestContext(request))
+
+#@login_required
+def processLanding(request):
+
+    #print " ************ ^^^^^^^^^^^^^ process " 
+
+    chronuxHomeButton = request.POST.get("chronuxHomeButton","0" )
+
+    #print " button = " + str(chronuxHomeButton)
+
+    if chronuxHomeButton == "0":
+        return uploadFile( request )
+    elif chronuxHomeButton == "1":
+	#print " ********** for list projects "
+        return listProjects ( request ) 
+    elif chronuxHomeButton == "2":
+        return displayExpressionLevels ( request ) 
+    elif chronuxHomeButton == "3":
+        return brainConnectivity ( request )
+    elif chronuxHomeButton == "4":
+        return listAnalysisHeaders ( request )     
+    elif chronuxHomeButton == "5":
+        return submittedJobs ( request )
+    
+@login_required
+def processDisplayExpressionLevels(request):
+
+    expressionLevelsButton = request.POST.get("expressionLevelsButton","0" )
+
+    if expressionLevelsButton == "0":
+        return displayGeneExpressionLevels( request )
+    elif expressionLevelsButton == "1":
+        return displayBrainRegionExpressionLevels ( request ) 
+    
+@login_required
+def analyzeFileSelect(request):
+    
+    dataFileId = request.POST.get("dataFileId",0 ) 
+    
+    dataFile = DataFile.objects.get(pk = dataFileId)
+    
+    analysisDetails = AnalysisDetail.objects.filter(dataFile = dataFile)
+
+    phenotypeFileType = FileType.objects.filter(name = "phenotypeFile")[0] 
+    
+    phenotypeFiles = DataFile.objects.filter(project = dataFile.project, fileType = phenotypeFileType)
+
+    analysisDetailObjList = []
+    
+    for analysisDetail in analysisDetails:
+	
+      analysisDetailObj = AnalysisDetailObj()
+    
+      analysisDetailObj.analysisDetail = analysisDetail
+	
+      submittedJob = SubmittedJob.objects.filter(analysisDetail = analysisDetail)[0]
+	
+      analysisDetailObj.dateAnalyzed = submittedJob.completedTime
+	
+      analysisDetailObjList.append(analysisDetailObj)
+    
+    return render_to_response('chronux/analyzeFileSelect.html', {
+        
+        "dataFile":dataFile,
+        "analysisDetailObjList":analysisDetailObjList,
+        "phenotypeFiles":phenotypeFiles,
+
+    },  RequestContext(request)) 
+
+
+@login_required
+def showPlots(request):
+    
+    try:
+
+     dataFileId = request.POST.get("dataFileId",0) 
+    
+     dataFile = DataFile.objects.get(pk = dataFileId)
+    
+     phenotypeFileName = request.POST.get("phenotypeFileName","") 
+	
+     phenotypeColumns = request.POST.getlist("phenotypeColumn") 
+	
+     columnTypeIds = request.POST.getlist("columnTypeId") 
+	
+     contrasts = request.POST.getlist("contrastString")     
+    
+     normalizationMethod = request.POST.get("normalizationMethod",0)    
+	
+     columnTypeIds = [int(x) for x in columnTypeIds  if x != '' ]
+	
+     phenotypeColumnObjList = []
+	
+     samples = []
+	
+     animals = []
+	
+     plotMDSPathList = []
+    
+     sampleColumn = ''
+	
+	#print " column type ids = " + str(columnTypeIds)
+
+     for index, columnTypeId in enumerate ( columnTypeIds ):
+	    
+      if phenotypeColumns [index] != '':
+		
+        columnType = ColumnType.objects.get(pk = int(columnTypeId))
+		
+	if columnType.name == "factor":		
+	    
+	    phenotypeColumnObj = PhenotypeColumnObj()
+	    
+	    phenotypeColumnObj.colName = phenotypeColumns [index]
+	    phenotypeColumnObj.columnType = columnType
+	    
+	    phenotypeColumnObjList.append(phenotypeColumnObj)
+	    
+	elif columnType.name == "sample":
+	    
+	    sampleColumn = phenotypeColumns [index]	    
+		
+	filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+	
+	phenotypeFile = pd.DataFrame.from_csv(filePath + "/" + str(phenotypeFileName), index_col=False)	    
+	
+	factorSetList = []
+	
+	listPlotFactors = []
+	
+	listPlotFactorNames = []  
+	
+	sampleColumnName = ''
+	
+	blockColumn = ''
+	
+	factorColumns = []
+
+	factorColumnValues = []
+	
+	for phenotypeColumnObj in phenotypeColumnObjList:
+	    
+	    #print " file is = " + str(phenotypeFile)
+	    
+	    #print " column is " + str (phenotypeColumnObj.colName) + " col name = " + str(phenotypeColumnObj.colName) + " column type name " + str(columnType.name)
+	    
+	    #print " samples are " + str(phenotypeFile [phenotypeColumnObj.colName])
+	    
+	    columnValues = phenotypeFile [phenotypeColumnObj.colName].tolist()
+	    
+	    columnValueList = list(columnValues)
+	    
+	    factorColumnValues.append(columnValueList)
+	    
+	    if phenotypeColumnObj.columnType.name == "factor":
+		
+		columnValueList = [x.replace(" ","_").replace("(","").replace(")","") for x in columnValueList]		    
+    
+		factorSetList.append(columnValueList)
+    
+		listPlotFactors.append(columnValueList)
+		
+		listPlotFactorNames.append(phenotypeColumnObj.colName)   
+		
+		factorColumns.append(phenotypeColumnObj.colName)
+		
+		plotMDSPathList.append("plotMDS_" + phenotypeColumnObj.colName)
+		    
+	    elif phenotypeColumnObj.columnType.name == "sample" and len(samples) == 0: 
+		
+		samples = columnValueList
+		
+		sampleColumnName = phenotypeColumnObj.columnType.name
+		    
+	    elif phenotypeColumnObj.columnType.name == "block" and len(animals) == 0:
+		
+		animals = columnValueList
+		
+		blockColumn = phenotypeColumnObj.columnType.name	    
+    
+	factors = []
+	    
+	#print " factor set list = " + str(factorSetList)
+	    
+	factors = [".".join(x) for x in zip (*factorSetList)]	
+	
+	factorSetList = [list(set(x)) for x in factorSetList]
+	
+	factorSetList = [x[0] for x in factorSetList]	
+	
+	factorColumnValuesMap = {}
+	
+	for factorIndex, factorColumn in enumerate(factorColumns):
+	    
+	    factorColumnValuesMap[factorColumn] = robjects.StrVector(factorColumnValues[factorIndex])
+	
+	DESIGN_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/make_design_matrix.R'); design_matrix")
+	
+	designMatrixR = numpy.array(DESIGN_FN( robjects.StrVector(factors)))
+    
+	#print " designMatrix = " + str(designMatrixR)    
+    
+	LEVELS_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/find_levels.R'); find_levels")
+	
+	matrixColumns = numpy.array(LEVELS_FN( robjects.StrVector(factors)))
+    
+	#print " matrix columns = " + str(matrixColumns)	    
+	
+	designMatrix = []
+	
+	for row in designMatrixR:
+	    
+	    row = [int(x) for x in numpy.array(row)]		
+	    
+	    designMatrix.append(numpy.array(row))	
+	    
+	CONTRASTS_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/make_contrasts.R'); contrasts_matrix")
+
+	#print " contrastMatrix = " + str(contrasts)
+	
+	contrastMatrixR = numpy.array(CONTRASTS_FN( robjects.StrVector(factors), robjects.StrVector(contrasts)))
+
+	#print " contrastMatrix = " + str(contrastMatrixR)
+
+	contrastMatrix = []
+	
+	#for row in contrastMatrixR:
+	    
+	    #row = [int(x) for x in numpy.array(row)]
+	    
+	    #contrastMatrix.append(numpy.array(row))	
+	    
+	    #print " adding row " + str(row)
+	    
+	contrastMatrixRowObjList = []
+	
+	for rowIndex, row in enumerate ( contrastMatrixR ) :
+	    
+	    row = [int(x) for x in numpy.array(row)]
+	    
+	    contrastMatrix.append(numpy.array(row))	
+	    
+	    #print " adding row " + str(row)
+	    
+	    contrastMatrixRowObj = ContrastMatrixRowObj()
+	    
+	    contrastMatrixRowObj.contrastLevel = matrixColumns [rowIndex]
+	    
+	    contrastMatrixRowObj.contrastMatrixRow = numpy.array(row)
+	    
+	    contrastMatrixRowObjList.append(contrastMatrixRowObj)	    
+	    
+	#designMatrixFilePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+	#contrastMatrixFilePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+	
+	contrastMatrixColumns = contrasts
+	
+	matrixColumnMatchObjList = []	
+
+	sampleNames = phenotypeFile [sampleColumn].tolist()
+	
+	numSamples = xrange(len(sampleNames))
+	
+	for sampleIndex, sampleName in enumerate(sampleNames):
+	    
+	    matrixColumnMatchObj = MatrixColumnMatchObj()
+	    
+	    sampleNameValue = request.POST.get("sampleName-" + str(sampleIndex),"" )
+	    
+	    #print " sample name value = " + str(sampleNameValue) + " for : sampleName-" + str(sampleIndex)
+	    
+	    matchColumnValue = request.POST.get("dataMatrixColumn-" + str(sampleIndex),"" )
+	    
+	    #print " match column value = " + str(matchColumnValue) + " for : sampleName-" + str(sampleIndex)	
+	    
+	    matrixColumnMatchObj.selectedSampleName = sampleNameValue
+	    matrixColumnMatchObj.selectedMatrixColumn = matchColumnValue		
+    
+	    matrixColumnMatchObjList.append(matrixColumnMatchObj)	
+	
+	sampleXrefList = []	
+	
+	#print " ****** sample column = " + str(sampleColumn)
+	
+	sampleNames = phenotypeFile [sampleColumn].tolist()	
+	
+	numSamples = xrange(len(sampleNames))
+	
+	for sampleIndex, sampleName in enumerate(sampleNames):
+	    
+	    matchColumnValue = request.POST.get("dataMatrixColumn-" + str(sampleIndex),"" )
+	    
+	    #print " match column value = " + str(matchColumnValue)	+ " for : sampleName-" + str(sampleIndex)
+	    
+	    sampleXrefList.append(matchColumnValue)	
+	
+	basePlotPath = settings.IMAGE_OUTPUT_FOLDER
+	
+	filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+	
+	countsMatrixFilePath = filePath + "/" + str(dataFile.name) +".csv"	
+
+	#print " matrix file path = " + str(countsMatrixFilePath)
+	#print " base plot path = " + str(basePlotPath)
+	#print " factors = " + str(factors)
+	#print " factorColumns = " + str(factorColumns)
+	#print " factorColumnValuesMap = " + str(factorColumnValuesMap)
+	#print " factorSetList = " + str(factorSetList)
+	#print " sampleXRefList = " + str(sampleXrefList)
+	#print " sampleNames = " + str(sampleNames)
+	
+	PLOT_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/create_plots.R'); createPlots")
+    
+	PLOT_FN(countsMatrixFilePath, basePlotPath, robjects.StrVector(factors), robjects.StrVector(factorColumns), robjects.ListVector(factorColumnValuesMap), robjects.StrVector(factorSetList), robjects.StrVector(sampleXrefList), robjects.StrVector(sampleNames))	
+	
+	plotMAPath = "plotMA"
+
+	#plotMDSPath = "plotMDS"
+	
+    except:
+	
+	traceback.print_exc(file=sys.stdout)		
+    
+    return render_to_response('chronux/showPlots.html', {
+	
+        #"dataFileId": dataFileId,
+        
+        #"dataFile":dataFile,
+        #"designMatrix":designMatrix,
+        #"matrixColumns":matrixColumns,
+
+        #"contrasts":contrasts,
+
+        #"phenotypeFilePath":phenotypeFilePath,
+        #"phenotypeColumns":phenotypeColumns, 
+        #"columnTypeIds":columnTypeIds,         
+    
+        "plotMAPath":plotMAPath,         
+        "plotMDSPathList":plotMDSPathList,         
+        
+        "datafile":dataFile,
+        "designMatrix":designMatrix,
+
+        "matrixColumns":matrixColumns,
+
+        "contrasts":contrasts,
+        "contrastMatrix":contrastMatrix,
+        "contrastMatrixColumns":contrastMatrixColumns,
+        "phenotypeFileName":phenotypeFileName,
+        "phenotypeColumns":phenotypeColumns, 
+        "columnTypeIds":columnTypeIds,
+        "contrastMatrixRowObjList":contrastMatrixRowObjList,
+        #"decidetestsLFC":decidetestsLFC,
+        #"decidetestsPValue":decidetestsPValue,
+        
+        "matrixColumnMatchObjList":matrixColumnMatchObjList,        
+
+    },  RequestContext(request))     
+
+@login_required
+def analyzeFileSubmit(request):
+
+    dataFileId = request.POST.get("dataFileId",0) 
+
+    dataFile = DataFile.objects.get(pk = dataFileId)
+
+    phenotypeFileName = request.POST.get("phenotypeFileName","") 
+    
+    phenotypeColumns = request.POST.getlist("phenotypeColumn") 
+    
+    columnTypeIds = request.POST.getlist("columnTypeId") 
+    
+    contrasts = request.POST.getlist("contrastString")     
+
+    normalizationMethod = request.POST.getlist("normalizationMethod")    
+
+    decidetestsPValue = request.POST.getlist("decidetestsPValue")        
+
+    decidetestsLFC = request.POST.getlist("decidetestsLFC")    
+    
+    columnTypeIds = [int(x) for x in columnTypeIds  if x != '' ]
+    
+    #print "phenotypeColumns = " + str(phenotypeColumns)
+    
+    #print "columnTypeIds = " + str(columnTypeIds)
+    
+    phenotypeColumnObjList = []
+    
+    samples = []
+    
+    animals = []
+    
+    plotMDSPathList = []
+	
+    sampleColumn = ''
+
+    #print " column type ids = " + str(columnTypeIds)
+
+    for index, columnTypeId in enumerate ( columnTypeIds ):
+	
+	if phenotypeColumns [index] != '':
+	    
+	    columnType = ColumnType.objects.get(pk = int(columnTypeId))
+	    
+	    if columnType.name == "factor":		
+	    
+		phenotypeColumnObj = PhenotypeColumnObj()
+		
+		phenotypeColumnObj.colName = phenotypeColumns [index]
+		phenotypeColumnObj.columnType = columnType
+		
+		phenotypeColumnObjList.append(phenotypeColumnObj)
+	    
+	    elif columnType.name == "sample":
+	    
+		sampleColumn = phenotypeColumns [index]	    
+	    
+    filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+    
+    phenotypeFile = pd.DataFrame.from_csv(filePath + "/" + str(phenotypeFileName), index_col=False)	    
+    
+    factorSetList = []
+    
+    listPlotFactors = []
+    
+    listPlotFactorNames = []  
+    
+    sampleColumnName = ''
+    
+    blockColumn = ''
+    
+    factorColumns = []
+
+    factorColumnValues = []    
+    
+    for phenotypeColumnObj in phenotypeColumnObjList:
+	
+	#print " file is = " + str(phenotypeFile)
+	
+	#print " column is " + str (phenotypeColumnObj.colName) + " col name = " + str(phenotypeColumnObj.colName) + " column type name " + str(columnType.name)
+	
+	#print " samples are " + str(phenotypeFile [phenotypeColumnObj.colName])
+	
+	columnValues = phenotypeFile [phenotypeColumnObj.colName].tolist()
+	
+	columnValueList = list(columnValues)
+
+	factorColumnValues.append(columnValueList)	
+
+	if phenotypeColumnObj.columnType.name == "factor":
+	    
+	    columnValueList = [x.replace(" ","_").replace("(","").replace(")","") for x in columnValueList]		    
+
+	    factorSetList.append(columnValueList)
+
+	    listPlotFactors.append(columnValueList)
+	    
+	    listPlotFactorNames.append(phenotypeColumnObj.colName)   
+	    
+	    factorColumns.append(phenotypeColumnObj.colName)
+	    
+	    plotMDSPathList.append("plotMDS_" + phenotypeColumnObj.colName)
+		
+	elif phenotypeColumnObj.columnType.name == "sample" and len(samples) == 0: 
+	    
+	    samples = columnValueList
+	    
+	    sampleColumnName = phenotypeColumnObj.columnType.name
+		
+	elif phenotypeColumnObj.columnType.name == "block" and len(animals) == 0:
+	    
+	    animals = columnValueList
+	    
+	    blockColumn = phenotypeColumnObj.columnType.name	    
+
+    factors = []
+	
+    #print " factor set list = " + str(factorSetList)
+	
+    factors = [".".join(x) for x in zip (*factorSetList)]	
+    
+    DESIGN_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/make_design_matrix.R'); design_matrix")
+    
+    designMatrixR = numpy.array(DESIGN_FN( robjects.StrVector(factors)))
+
+    #print " designMatrix = " + str(designMatrixR)    
+
+    LEVELS_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/find_levels.R'); find_levels")
+    
+    matrixColumns = numpy.array(LEVELS_FN( robjects.StrVector(factors)))
+
+    #print " matrix columns = " + str(matrixColumns)	    
+    
+    designMatrix = []
+    
+    for row in designMatrixR:
+	
+	row = [int(x) for x in numpy.array(row)]		
+	
+	designMatrix.append(numpy.array(row))	
+	
+    CONTRASTS_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/make_contrasts.R'); contrasts_matrix")
+
+    #print " contrastMatrix = " + str(contrasts)
+    
+    contrastMatrixR = numpy.array(CONTRASTS_FN( robjects.StrVector(factors), robjects.StrVector(contrasts)))
+
+    #print " contrastMatrix = " + str(contrastMatrixR)
+
+    contrastMatrix = []
+    
+    for row in contrastMatrixR:
+	
+	row = [int(x) for x in numpy.array(row)]
+	
+	contrastMatrix.append(numpy.array(row))	
+	
+	#print " adding row " + str(row)
+	
+    sampleXrefList = []	    
+    
+    sampleNames = phenotypeFile [sampleColumn].tolist()
+    
+    numSamples = xrange(len(sampleNames))
+    
+    for sampleIndex, sampleName in enumerate(sampleNames):
+	
+	matchColumnValue = request.POST.get("dataMatrixColumn-" + str(sampleIndex),"" )
+	
+	#print " match column value = " + str(matchColumnValue)	+ " for : sampleName-" + str(sampleIndex)
+	
+	sampleXrefList.append(matchColumnValue)
+    
+    #basePath = settings.PROJECT_BASE_FOLDER 
+    
+    basePlotPath = settings.IMAGE_OUTPUT_FOLDER # + "/webchronux/static/img/"
+    
+    #filePath = settings.DATA_OUTPUT_FOLDER # + "/webchronux/" + str(datafile.filePath)
+
+    countsMatrixFilePath = filePath + "/" + str(dataFile.name) +".csv"
+    
+    analysisDetail = AnalysisDetail(dataFile = dataFile, sample = sampleColumnName, block = blockColumn)	
+    analysisDetail.save()    
+        
+    for factorColumn in factorColumns:
+    
+	designFactor = DesignFactor(name = factorColumn, description = factorColumn, analysisDetail = analysisDetail) 
+	designFactor.save()
+	
+    for contrast in contrasts:     
+    
+	limmaContrast = LimmaContrast(analysisDetail = analysisDetail, name = contrast, description = contrast )
+	limmaContrast.save()	
+
+    queueJobStatusCode = JobStatusCode.objects.all().filter(code="QUEUE")[0]
+    analysisJobType  = SubmittedJobType.objects.all().filter(name="Analysis")[0]
+    
+    submittedJob = SubmittedJob (name = " Limma analysis " + str(analysisDetail.id ), description = " Limma analysis " + str(analysisDetail.id ), submittedBy = request.user, submittedOn= datetime.datetime.now(), jobStatusCode = queueJobStatusCode, analysisDetail = analysisDetail, submittedJobType = analysisJobType)
+ 
+    submittedJob.save()  
+    
+    outputPath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) + "/Analysis_" + str(analysisDetail.id)
+    
+    #print " output path = " + str(outputPath)
+    #print " file path = " + str(countsMatrixFilePath)
+    #print " base plot path = " + str(basePlotPath)
+    #print " listPlotFactorNames = " + str(listPlotFactorNames)
+
+    #print " samples = " + str(samples)
+    #print " factors = " + str(factors)
+    #print " animals = " + str(animals)
+    #print " listPlotFactors = " + str(listPlotFactors)
+    #print " contrasts = " + str(contrasts)
+    #print " decidetestsPValue = " + str(decidetestsPValue)
+    #print " decidetestsLFC = " + str(decidetestsLFC)    
+    
+    if not os.path.isdir(outputPath):
+	os.mkdir(outputPath)
+	
+    designMatrixFilePath = outputPath + "/designMatrix.csv"
+    contrastMatrixFilePath = outputPath + "/contrastMatrix.csv"
+    
+    designMatrixDf = pd.DataFrame(designMatrix, columns = matrixColumns)
+    designMatrixDf.to_csv(designMatrixFilePath, index = False)
+    
+    contrastMatrixDf = pd.DataFrame(contrastMatrix, columns = contrasts)
+    contrastMatrixDf["Levels"] = matrixColumns
+    contrastMatrixDf.to_csv(contrastMatrixFilePath, index = "Levels") 	
+
+    listPlotFactorNames = ["plotMA"]
+    
+    for factorColumn in factorColumns:
+	listPlotFactorNames.append("plotMDS_" + factorColumn)
+	
+    for listPlotFactorName in listPlotFactorNames:     
+    
+	analysisPlot = AnalysisPlot(analysisDetail = analysisDetail, name = "Plot " + str(listPlotFactorName), plotPath = settings.IMAGE_OUTPUT_FOLDER + "/" + listPlotFactorName, plotFileName = listPlotFactorName)
+	analysisPlot.save()
+
+    for contrast in contrasts:     
+    
+	analysisResultFile = AnalysisResultFile(analysisDetail = analysisDetail, name = "Result " + str(contrast), filePath = outputPath + "/" + contrast, resultFileName = contrast)
+	analysisResultFile.save()
+    
+    ts.submitLimma.delay(countsMatrixFilePath, basePlotPath, outputPath, factors, factorColumns, factorColumnValues, factorSetList, sampleXrefList, sampleNames, animals, contrasts, submittedJob)    
+    
+    #print " phenotype columns = " + str(phenotypeColumns)
+
+    completedFlag = True
+
+    if not submittedJob.completedTime:
+	    
+	completedFlag = False
+	    
+    #print " ---- completed flag !!!!!!! = " + str(completedFlag)
+    
+    return render_to_response('chronux/displaySubmittedJob.html', {
+        "submittedJob":submittedJob,
+        "completedFlag":completedFlag,
+    },  RequestContext(request))  
+
+@login_required
+def analyzeFileSelectColumns(request):
+    
+    dataFileId = request.POST.get("dataFileId",0 ) 
+     
+    dataFile = DataFile.objects.get(pk = dataFileId)    
+    
+    phenotypeFileId = 0
+    
+    try:
+	phenotypeFileId = int(request.POST.get("phenotypeFileId","0" ) )
+    
+    except:
+	pass
+    phenotypeFileName = ''
+    
+
+    phenotypeColumnObjList = []
+
+    phenotypeDataList = []
+
+    columnTypes = ColumnType.objects.all()
+    
+    phenotypeRowValuesList = []
+    phenotypeColumns = []
+	
+    phenotypeLines = [] 
+	
+    if phenotypeFileId != 0 : 
+	
+	phenotypeFile = DataFile.objects.get(pk = phenotypeFileId) 
+	
+	phenotypeLines = open(settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) + "/" + phenotypeFile.name, "r")
+	
+	phenotypeFileName = phenotypeFile.name
+	
+    else:
+
+	phenotypeFile = request.FILES['datafilePath']
+	
+	phenotypeFileName = request.FILES['datafilePath'].name
+    
+	phenotypeData = phenotypeFile.read()
+    
+	phenotypeLines = phenotypeData.split("\r")
+    
+    for index, phenotype in enumerate ( phenotypeLines ) :
+	if index == 0:
+	    
+	    phenotypeColumns = phenotype.replace("\t","").replace("\n","").split(",")	
+	    
+	    #print " columns = " + str(phenotypeColumns)
+	    
+	    for phenotypeColumn in phenotypeColumns:
+		
+		phenotypeColumnObj = PhenotypeColumnObj()
+		
+		phenotypeColumnObj.colName = phenotypeColumn
+		
+		phenotypeColumnObjList.append (phenotypeColumnObj)
+	    
+	    continue
+
+	phenotypeRowValues = phenotype.replace("\t","").replace("\n","").split(",")
+	
+	phenotypeRowValuesList.append(phenotypeRowValues)
+	
+	phenotypeObjList = []
+
+	for phenotypeRowValue in phenotypeRowValues :  
+
+	    phenotypeObj = PhenotypeObj()
+	
+	    phenotypeObj.colName = phenotypeRowValue
+
+	    phenotypeObjList.append (phenotypeObj)
+	    
+	phenotypeDataList.append(phenotypeObjList)
+	
+    if phenotypeFileId == 0 : 	
+	
+	filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+	
+	if not os.path.isdir( filePath ):
+	    os.mkdir(filePath)
+	
+	df = pd.DataFrame(phenotypeRowValuesList, columns = phenotypeColumns)
+	
+	df.to_csv(filePath + "/" + str(phenotypeFile), index = False )  
+	
+	phenotypeFileType = FileType.objects.filter(name = "phenotypeFile")[0]    
+	
+	phenotypeFile = DataFile ( name = phenotypeFile , description = "Phenotype File", project = dataFile.project, filePath = filePath, fileType = phenotypeFileType)
+	phenotypeFile.save() 	
+	
+    return render_to_response('chronux/analyzeFileSelectColumns.html', {
+        
+        "dataFile":dataFile,
+        "columnTypes":columnTypes,
+        "phenotypeColumnObjList":phenotypeColumnObjList,
+        "phenotypeDataList":phenotypeDataList,
+        "phenotypeFileName":phenotypeFileName,
+    },  RequestContext(request)) 
+
+def fetchAnalysisParameters(request):
+
+    robjects.r('library(Biobase)')
+    robjects.r('library(statmod)')
+    robjects.r('library(affy)')
+    robjects.r('library(edgeR)')
+    robjects.r('require(limma)')
+
+    dataFileId = request.POST.get("dataFileId",0) 
+
+    phenotypeFilePath = request.POST.get("phenotypeFilePath","") 
+    
+    phenotypeColumns = request.POST.getlist("phenotypeColumn") 
+    
+    columnTypeIds = request.POST.getlist("columnTypeId") 
+    
+    columnTypeIds = [int(x) for x in columnTypeIds  if x != '' ]
+    
+    #print "phenotypeColumns = " + str(phenotypeColumns)
+    
+    #print "columnTypeIds = " + str(columnTypeIds)
+    
+    phenotypeColumnObjList = []
+    
+    for index, columnTypeId in enumerate ( columnTypeIds ):
+	
+	#print " id = " + str(columnTypeId)
+	
+	if phenotypeColumns [index] != '':
+	    
+	    #print " for phenotypeColumns [index] = " + str(phenotypeColumns [index]) + " column type id = " + str(columnTypeId)
+	    
+	    columnType = ColumnType.objects.get(pk = int(columnTypeId))
+	    
+	    if columnType.name == "factor":
+	    
+		phenotypeColumnObj = PhenotypeColumnObj()
+		
+		phenotypeColumnObj.colName = phenotypeColumns [index]
+		phenotypeColumnObj.columnType = columnType
+		
+		phenotypeColumnObjList.append(phenotypeColumnObj)
+    
+    dataFile = DataFile.objects.get(pk = dataFileId)  
+    
+    phenotypeFile = pd.DataFrame.from_csv(phenotypeFilePath)
+    
+    #print " columns = " + str(phenotypeFile.columns)
+    
+    factorSetList = []
+    
+    for phenotypeColumnObj in phenotypeColumnObjList:
+	
+	columnValues = phenotypeFile [phenotypeColumnObj.colName].tolist()
+	
+	columnValueList = list(columnValues)
+	
+	factorSetList.append(columnValueList)
+	
+    combinationStringList = [".".join(x) for x in zip (*factorSetList)]
+    
+    #print ":::: " + str(combinationStringList)
+    
+    rfactorList = robjects.StrVector(combinationStringList)
+    
+    robjects.globalenv["f"] = rfactorList
+	
+    #combinationStringList = [".".join(x) for x in combinationStringList]
+    
+    #print " combinationStringList *** " + str(combinationStringList)	
+    
+    robjects.r('design.limma <-model.matrix(~0+f)')
+
+    designMatrixR = numpy.array(robjects.globalenv["design.limma"])
+
+    designMatrix = []
+    
+    for row in designMatrixR:
+	
+	designMatrix.append(numpy.array(row))
+	
+	#print " row = " +str(row[1])
+    
+    #print str(numpy.array(designMatrix))
+    
+    robjects.r('colnames(design.limma)<-levels(f)')
+    
+    robjects.r('columnNames <- levels(f)')
+    
+    matrixColumns = numpy.array(robjects.globalenv["columnNames"])
+    
+    matrixColumns = list(set(combinationStringList))
+    
+    #print "constrast = " + str(list(set(combinationStringList)))
+    
+    combinationStringList =  list(set(combinationStringList))
+	
+    contrasts = []
+    
+    contrastTuples = list(itertools.combinations(combinationStringList,2))
+    
+    contrasts = ["-".join(x) for x in contrastTuples]
+    
+    return contrasts
+
+@login_required
+def analyzeFileSelectFactors(request):
+
+    dataFileId = request.POST.get("dataFileId",0) 
+
+    phenotypeFileName = request.POST.get("phenotypeFileName","") 
+    
+    phenotypeColumns = request.POST.getlist("phenotypeColumn") 
+    
+    columnTypeIds = request.POST.getlist("columnTypeId") 
+    
+    columnTypeIds = [int(x) for x in columnTypeIds  if x != '' ]
+    
+    phenotypeColumnObjList = []
+    
+    sampleColumn = ''
+    
+    for index, columnTypeId in enumerate ( columnTypeIds ):
+	
+	#print " id = " + str(columnTypeId)
+	
+	if phenotypeColumns [index] != '':
+	    
+	    #print " for phenotypeColumns [index] = " + str(phenotypeColumns [index]) + " column type id = " + str(columnTypeId)
+	    
+	    columnType = ColumnType.objects.get(pk = int(columnTypeId))
+	    
+	    if columnType.name == "factor":
+	    
+		phenotypeColumnObj = PhenotypeColumnObj()
+		
+		phenotypeColumnObj.colName = phenotypeColumns [index]
+		phenotypeColumnObj.columnType = columnType
+		
+		phenotypeColumnObjList.append(phenotypeColumnObj)
+		
+	    elif columnType.name == "sample":
+		
+		sampleColumn = phenotypeColumns [index]
+    
+    dataFile = DataFile.objects.get(pk = dataFileId)  
+    
+    #print " path = " + str(phenotypeFileName)
+    
+    filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+    
+    phenotypeFile = pd.DataFrame.from_csv(filePath + "/" + str(phenotypeFileName), index_col = False)
+    
+    factorSetList = []
+    
+    for phenotypeColumnObj in phenotypeColumnObjList:
+	
+	columnValues = phenotypeFile [phenotypeColumnObj.colName].tolist()
+	
+	columnValueList = list(columnValues)
+	
+	columnValueList = [x.replace(" ","_").replace("(","").replace(")","") for x in columnValueList]
+	
+	factorSetList.append(columnValueList)
+	
+    factors = [".".join(x) for x in zip (*factorSetList)]
+
+    #print " factors = " + str(factors)
+    
+    DESIGN_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/make_design_matrix.R'); design_matrix")
+    
+    designMatrixR = numpy.array(DESIGN_FN( robjects.StrVector(factors)))
+
+    #print " designMatrix = " + str(designMatrixR)    
+
+    LEVELS_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/find_levels.R'); find_levels")
+    
+    matrixColumns = numpy.array(LEVELS_FN( robjects.StrVector(factors)))
+
+    #print " matrix columns = " + str(matrixColumns)   
+    
+    designMatrix = []
+    
+    for row in designMatrixR:
+	
+	#row = numpy.array(row)
+	
+	row = [int(x) for x in numpy.array(row)]
+	
+	designMatrix.append(numpy.array(row))
+	
+    factors =  list(set(factors))
+	
+    contrasts = []
+    
+    contrastTuples = list(itertools.combinations(factors,2))
+    
+    contrasts = ["-".join(x) for x in contrastTuples]
+    
+    otherContrasts = itertools.combinations(contrasts,2)
+    
+    otherContrasts = ["(" + x + ")-(" + y + ")" for (x,y) in otherContrasts]
+    
+    #contrasts.extend(list(otherContrasts))
+
+    #print " sample columns = " + str(sampleColumn) + " -- " + str(phenotypeFile.columns)
+    
+    sampleNames = phenotypeFile [sampleColumn].tolist()
+    
+    numSamples = xrange(len(sampleNames))
+    
+    filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(dataFile.project.id) 
+    
+    contrastMatrixFileDF = pd.DataFrame.from_csv(filePath + "/" + str(dataFile.name) + ".csv", sep="\t") 
+
+    dataMatrixColumns = contrastMatrixFileDF.columns[5:]
+    
+    matrixColumnMatchObjList = []
+    
+    #print " data matrix columns = " + str(dataMatrixColumns)
+
+    for sampleName in sampleNames:
+	
+	matrixColumnMatchObj = MatrixColumnMatchObj()
+	
+	matrixColumnMatchObj.sampleNames = sampleNames
+	matrixColumnMatchObj.dataMatrixColumns = dataMatrixColumns
+
+	matrixColumnMatchObj.selectedSampleName = sampleName
+
+	#print " sample name = " + str(sampleName)
+	
+	matchColumns = [x for x in dataMatrixColumns if sampleName in x]
+	
+	if len(matchColumns) > 0:
+	    
+	    matchColumn = matchColumns[0]
+	
+	    matrixColumnMatchObj.selectedMatrixColumn = matchColumn
+	    
+	matrixColumnMatchObjList.append(matrixColumnMatchObj)
+
+    return render_to_response('chronux/analyzeFileSelectFactors.html', {
+        
+        "dataFile":dataFile,
+        "designMatrix":designMatrix,
+        "matrixColumns":matrixColumns,
+
+        "contrasts":contrasts,
+
+        "phenotypeFileName":phenotypeFileName,
+        "phenotypeColumns":phenotypeColumns, 
+        "columnTypeIds":columnTypeIds, 
+        
+        "otherContrasts":otherContrasts,
+        
+        "matrixColumnMatchObjList":matrixColumnMatchObjList,
+                
+    },  RequestContext(request)) 
+
+@login_required
+def analyzeFileShowContrastMatrix(request):
+
+    try:
+
+	    datafileId = request.POST.get("dataFileId",0 )
+	    
+	    datafile = DataFile.objects.get(pk = datafileId)	    
+	    
+	    phenotypeFileName = request.POST.get("phenotypeFileName","") 	
+
+	    phenotypeColumns = request.POST.getlist("phenotypeColumn" )
+	    columnTypeIds = request.POST.getlist("columnTypeId" )
+    
+	    #print " phenotypeColumns = ***** = " + str(phenotypeColumns)	
+	    
+	    columnTypeIds = request.POST.getlist("columnTypeId") 
+	    
+	    contrasts = request.POST.getlist("contrastString")  
+    
+	    #print " contrastStrings = " + str(contrasts)	    
+	    
+	    #decidetestsLFC = DECIDE_TESTS_LFC
+	    
+	    #decidetestsPValue = DECIDE_TESTS_PVALUE
+	    
+	    columnTypeIds = [int(x) for x in columnTypeIds  if x != '' ]
+	    
+	    phenotypeColumnObjList = []
+	    
+	    sampleColumn = ''
+	    
+	    for index, columnTypeId in enumerate ( columnTypeIds ):
+		
+		if phenotypeColumns [index] != '':
+		    
+		    columnType = ColumnType.objects.get(pk = int(columnTypeId))
+		    
+		    if columnType.name == "factor":
+		    
+			phenotypeColumnObj = PhenotypeColumnObj()
+			
+			phenotypeColumnObj.colName = phenotypeColumns [index]
+			phenotypeColumnObj.columnType = columnType
+			
+			phenotypeColumnObjList.append(phenotypeColumnObj)
+			
+		    elif columnType.name == "sample":
+			
+			sampleColumn = phenotypeColumns [index]
+	    
+	    filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(datafile.project.id) 
+	    
+	    phenotypeFile = pd.DataFrame.from_csv(filePath + "/" + str(phenotypeFileName), index_col = None)
+	    
+	    #print str(phenotypeFile)
+	    
+	    factorSetList = []
+	    
+	    listPlotFactors = []
+	    
+	    for phenotypeColumnObj in phenotypeColumnObjList:
+		
+		#print " column is " + str (phenotypeColumnObj.colName) + " col name = " + str(phenotypeColumnObj.colName) + " column type name " + str(columnType.name)
+		
+		columnValues = phenotypeFile [phenotypeColumnObj.colName].tolist()
+		
+		columnValueList = list(columnValues)
+		
+		if phenotypeColumnObj.columnType.name == "factor":
+		    
+		    columnValueList = [x.replace(" ","_").replace("(","").replace(")","") for x in columnValueList]		    
+	
+		    factorSetList.append(columnValueList)
+	
+	    factors = [".".join(x) for x in zip (*factorSetList)]
+	
+	    #print " factors = " + str(factors)
+	    
+	    DESIGN_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/make_design_matrix.R'); design_matrix")
+	    
+	    designMatrixR = numpy.array(DESIGN_FN( robjects.StrVector(factors)))
+	
+	    #print " designMatrix = " + str(designMatrixR)    
+	
+	    LEVELS_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/find_levels.R'); find_levels")
+	    
+	    matrixColumns = numpy.array(LEVELS_FN( robjects.StrVector(factors)))
+	
+	    #print " matrix columns = " + str(matrixColumns)	    
+	    
+	    designMatrix = []
+	    
+	    for row in designMatrixR:
+		
+		row = [int(x) for x in numpy.array(row)]		
+		
+		designMatrix.append(numpy.array(row))	
+		
+	    CONTRASTS_FN = robjects.r("source('" + settings.PROJECT_BASE_FOLDER + "/make_contrasts.R'); contrasts_matrix")
+
+	    #print " contrastMatrix = " + str(contrasts)
+	    
+	    contrastMatrixR = numpy.array(CONTRASTS_FN( robjects.StrVector(factors), robjects.StrVector(contrasts)))
+
+	    #print " contrastMatrix = " + str(contrastMatrixR)
+
+	    contrastMatrix = []
+	    
+	    contrastMatrixRowObjList = []
+	    
+	    for rowIndex, row in enumerate ( contrastMatrixR ) :
+		
+		row = [int(x) for x in numpy.array(row)]
+		
+		contrastMatrix.append(numpy.array(row))	
+		
+		#print " adding row " + str(row)
+		
+		contrastMatrixRowObj = ContrastMatrixRowObj()
+		
+		contrastMatrixRowObj.contrastLevel = matrixColumns [rowIndex]
+		
+		contrastMatrixRowObj.contrastMatrixRow = numpy.array(row)
+		
+		contrastMatrixRowObjList.append(contrastMatrixRowObj)
+		#self.contrastLevel = ''
+		#self.contrastMatrixRow = []		
+	    
+	    contrastMatrixColumns = contrasts
+	    
+	    matrixColumnMatchObjList = []	    
+	    
+	    sampleNames = phenotypeFile [sampleColumn].tolist()
+	    
+	    numSamples = xrange(len(sampleNames))
+	    
+	    for sampleIndex, sampleName in enumerate(sampleNames):
+		
+		matrixColumnMatchObj = MatrixColumnMatchObj()
+		
+		sampleNameValue = request.POST.get("sampleName-" + str(sampleIndex),"" )
+		
+		#print " sample name value = " + str(sampleNameValue) + " for : sampleName-" + str(sampleIndex)
+		
+		matchColumnValue = request.POST.get("dataMatrixColumn-" + str(sampleIndex),"" )
+		
+		#print " match column value = " + str(matchColumnValue)	+ " for : sampleName-" + str(sampleIndex)	
+		
+		matrixColumnMatchObj.selectedSampleName = sampleNameValue
+		matrixColumnMatchObj.selectedMatrixColumn = matchColumnValue		
+	
+		matrixColumnMatchObjList.append(matrixColumnMatchObj)
+	
+    except:
+	traceback.print_exc(file=sys.stdout)
+    
+    return render_to_response('chronux/analyzeFileShowContrastMatrix.html', {
+        
+        "datafile":datafile,
+        "designMatrix":designMatrix,
+
+        "matrixColumns":matrixColumns,
+
+        "contrasts":contrasts,
+        "contrastMatrix":contrastMatrix,
+        "contrastMatrixColumns":contrastMatrixColumns,
+        "phenotypeFileName":phenotypeFileName,
+        "phenotypeColumns":phenotypeColumns, 
+        "columnTypeIds":columnTypeIds, 
+        
+        "contrastMatrixRowObjList":contrastMatrixRowObjList,
+        
+        "matrixColumnMatchObjList":matrixColumnMatchObjList,
+
+    },  RequestContext(request)) 	
+
+@login_required
+def scatterPlotSubmit(request):
+    
+    #print " IN SCATTER !!!!!!!! "
+    
+    try:
+
+	analysisResultFilterObj = getAnalysisResultFilterObj(request)
+
+	analysisDetailId = request.POST.get("analysisDetailId",0 )
+	analysisDetail = AnalysisDetail.objects.get ( pk = analysisDetailId ) 
+	combinationString = analysisDetail.combinationString
+	
+	genesUp = []
+	genesDown = []
+	
+	genesUp = request.POST.getlist("geneUp") 
+	genesDown = request.POST.getlist("geneDown")
+	
+	#print " genes up are " + str ( genesUp ) 
+	#print " genes down are " + str ( genesDown ) 
+	
+	dataFile = open( settings.PROJECT_BASE_FOLDER + "/webBrainchronux/expdata_filtered_final_" + combinationString + ".csv" ,  "r" )
+	
+	index = 0
+	
+	geneExpressionScatterObjList = []
+	
+	upMarkedGeneExpressionScatterObjList = []	
+
+	downMarkedGeneExpressionScatterObjList = []
+	
+	for index, line in enumerate ( dataFile ):    
+	    
+	    if index == 0:        
+		continue
+	    
+	    if analysisResultFilterObj.numRecordsToDisplay != 0 and index > analysisResultFilterObj.numRecordsToDisplay + 1:
+		break 
+		
+	    line = line.replace("\"","").replace("\r","").replace("\n","")
+	    
+	    data = line.split(",")
+	    
+	    if data[0] == '':
+		break	    
+
+	    CPU_IN_values = [data[0], data[2], data[4]]
+	    CPU_IP_values = [data[1], data[3], data[5]]
+
+	    NAC_IN_values = [data[6], data[8], data[10]]
+	    NAC_IP_values = [data[7], data[9], data[11]]
+
+	    CPU_IN_values = [float(x) for x in CPU_IN_values]
+	    CPU_IP_values = [float(x) for x in CPU_IP_values]
+
+	    NAC_IN_values = [float(x) for x in NAC_IN_values]
+	    NAC_IP_values = [float(x) for x in NAC_IP_values]
+
+	    CPU_IN_value = numpy.mean(CPU_IN_values)
+	    CPU_IP_value = numpy.mean(CPU_IP_values)
+
+	    NAC_IN_value = numpy.mean(NAC_IN_values)
+	    NAC_IP_value = numpy.mean(NAC_IP_values)
+	    
+	    if combinationString == "NAC_IP_vs_NAC_IN":
+		
+		foldChangeValue1 = NAC_IP_value
+		foldChangeValue2 = NAC_IN_value
+
+	    elif combinationString == "CPU_IP_vs_NAC_IP":
+		
+		foldChangeValue1 = CPU_IP_value
+		foldChangeValue2 = NAC_IP_value
+		
+	    elif combinationString == "CPU_IP_vs_CPU_IN":
+		
+		foldChangeValue1 = CPU_IP_value
+		foldChangeValue2 = CPU_IN_value	
+		
+	    #print " compare " + str(abs(log(float(foldChangeValue1)/float(foldChangeValue2))) ) + " and " + str( analysisResultFilterObj.foldChangeCutOff )
+		
+	    #print " compare " + str(float(foldChangeValue1)/float(foldChangeValue2)) + " and " + str( analysisResultFilterObj.foldChangeCutOff )
+
+	    if analysisResultFilterObj.foldChangeCutOff != 0 and abs(log(float(foldChangeValue1)/float(foldChangeValue2))) < analysisResultFilterObj.foldChangeCutOff:
+		continue 
+    
+	    geneExpressionScatterObj = GeneExpressionScatterObj()
+	    
+	    geneExpressionScatterObj.gene = data[12]
+	    
+	    geneExpressionScatterObj.log2FoldChangeAvg1 = log(foldChangeValue1)
+	    geneExpressionScatterObj.log2FoldChangeAvg2 = log(foldChangeValue2)
+	    
+	    geneExpressionScatterObjList.append (geneExpressionScatterObj)
+	    
+	    arrowSize = 1
+	    
+	    ax = 60
+	    ay = -90
+
+	    if geneExpressionScatterObj.gene in genesUp:
+		    
+		#print " IN UP fold change value 1 = " + str (foldChangeValue1) + " 2 = " + str(foldChangeValue2) + " gene " + str(data[12])		
+
+		geneExpressionScatterObj.arrowSize = arrowSize
+		
+		geneExpressionScatterObj.ax = ax
+		geneExpressionScatterObj.ay = ay
+		
+		arrowSize = arrowSize + .2
+		ax = ax + 1
+		ay = ay - 1
+
+		upMarkedGeneExpressionScatterObjList.append (geneExpressionScatterObj)
+		
+	    if geneExpressionScatterObj.gene in genesDown:
+
+		#print " IN DOWN fold change value 1 = " + str (foldChangeValue1) + " 2 = " + str(foldChangeValue2) + " gene " + str(data[12])		
+
+		geneExpressionScatterObj.arrowSize = arrowSize
+		
+		geneExpressionScatterObj.ax = ax
+		geneExpressionScatterObj.ay = ay
+		
+		arrowSize = arrowSize + .2
+		ax = ax - 1
+		ay = ay + 1		
+
+		downMarkedGeneExpressionScatterObjList.append (geneExpressionScatterObj)		    
+	
+	#print " geneExpressionScatterObjList " + str ([(x.gene, x.log2FoldChangeAvg1, x.log2FoldChangeAvg2 ) for x in geneExpressionScatterObjList] )
+    except:
+	
+	traceback.print_exc(file=sys.stdout)	
+
+    return render_to_response('chronux/scatterplotSubmit.html', {
+        'geneExpressionScatterObjList':geneExpressionScatterObjList,
+        'upMarkedGeneExpressionScatterObjList':upMarkedGeneExpressionScatterObjList,
+        'downMarkedGeneExpressionScatterObjList':downMarkedGeneExpressionScatterObjList,
+        'analysisResultFilterObj':analysisResultFilterObj,        
+    },  RequestContext(request))   	
+	
+@login_required
+def correlationPlotSubmit(request):
+    
+    #print " IN SCATTER !!!!!!!! "
+    
+    try:
+
+	combinationString = request.POST.get("combinationString",0 )
+	
+	geneExpressionScatterObjList = []
+	
+	upMarkedGeneExpressionScatterObjList = []	
+
+	downMarkedGeneExpressionScatterObjList = []
+	
+	for index, line in enumerate ( dataFile ):    
+	    
+	    if index == 0:        
+		continue
+	    
+	    #if index >1300:        
+		#break
+		
+	    line = line.replace("\"","").replace("\r","").replace("\n","")
+	    
+	    data = line.split(",")
+	    
+	    if data[0] == '':
+		break	    
+
+	    CPU_IN_values = [data[0], data[2], data[4]]
+	    CPU_IP_values = [data[1], data[3], data[5]]
+
+	    NAC_IN_values = [data[6], data[8], data[10]]
+	    NAC_IP_values = [data[7], data[9], data[11]]
+
+	    CPU_IN_values = [float(x) for x in CPU_IN_values]
+	    CPU_IP_values = [float(x) for x in CPU_IP_values]
+
+	    NAC_IN_values = [float(x) for x in NAC_IN_values]
+	    NAC_IP_values = [float(x) for x in NAC_IP_values]
+
+	    CPU_IN_value = numpy.mean(CPU_IN_values)
+	    CPU_IP_value = numpy.mean(CPU_IP_values)
+
+	    NAC_IN_value = numpy.mean(NAC_IN_values)
+	    NAC_IP_value = numpy.mean(NAC_IP_values)
+	    
+	    if combinationString == "NAC_IP_vs_NAC_IN":
+		
+		foldChangeValue1 = NAC_IP_value
+		foldChangeValue2 = NAC_IN_value
+
+	    elif combinationString == "CPU_IP_vs_NAC_IP":
+		
+		foldChangeValue1 = CPU_IP_value
+		foldChangeValue2 = NAC_IP_value
+		
+	    elif combinationString == "CPU_IP_vs_CPU_IN":
+		
+		foldChangeValue1 = CPU_IP_value
+		foldChangeValue2 = CPU_IN_value	
+    
+	    geneExpressionScatterObj = GeneExpressionScatterObj()
+	    
+	    geneExpressionScatterObj.gene = data[12]
+	    
+	    geneExpressionScatterObj.log2FoldChangeAvg1 = log(foldChangeValue1)
+	    geneExpressionScatterObj.log2FoldChangeAvg2 = log(foldChangeValue2)
+	    
+	    geneExpressionScatterObjList.append (geneExpressionScatterObj)
+	    
+	    arrowSize = 1
+	    
+	    ax = 60
+	    ay = -90
+
+	    if geneExpressionScatterObj.gene in genesUp:
+		    
+		#print " IN UP fold change value 1 = " + str (foldChangeValue1) + " 2 = " + str(foldChangeValue2) + " gene " + str(data[12])		
+
+		geneExpressionScatterObj.arrowSize = arrowSize
+		
+		geneExpressionScatterObj.ax = ax
+		geneExpressionScatterObj.ay = ay
+		
+		arrowSize = arrowSize + .2
+		ax = ax + 1
+		ay = ay - 1
+
+		upMarkedGeneExpressionScatterObjList.append (geneExpressionScatterObj)
+		
+	    if geneExpressionScatterObj.gene in genesDown:
+
+		#print " IN DOWN fold change value 1 = " + str (foldChangeValue1) + " 2 = " + str(foldChangeValue2) + " gene " + str(data[12])		
+
+		geneExpressionScatterObj.arrowSize = arrowSize
+		
+		geneExpressionScatterObj.ax = ax
+		geneExpressionScatterObj.ay = ay
+		
+		arrowSize = arrowSize + .2
+		ax = ax - 1
+		ay = ay + 1		
+
+		downMarkedGeneExpressionScatterObjList.append (geneExpressionScatterObj)		    
+	
+	#print " geneExpressionScatterObjList " + str ([(x.gene, x.log2FoldChangeAvg1, x.log2FoldChangeAvg2 ) for x in geneExpressionScatterObjList] )
+    except:
+	
+	traceback.print_exc(file=sys.stdout)	
+
+    return render_to_response('chronux/scatterplotSubmit.html', {
+        'geneExpressionScatterObjList':geneExpressionScatterObjList,
+        'upMarkedGeneExpressionScatterObjList':upMarkedGeneExpressionScatterObjList,
+        'downMarkedGeneExpressionScatterObjList':downMarkedGeneExpressionScatterObjList,
+    },  RequestContext(request))   		
+	
+@login_required
+def brainConnectivity(request):
+    
+    try:
+    
+	#print " in connectivity "
+	
+	cpuBrainRegion = BrainRegion.objects.filter ( name = 'CPU')
+	nacBrainRegion = BrainRegion.objects.filter ( name = 'NAC')
+	
+	connectivityMatrix = []
+	
+	connectivityValueObjList = []
+	
+	projectionRegions = ['CPU-R','NAC-R','CPU-L','NAC-L']
+	
+	targetRegions = []
+	
+	workbook = openpyxl.load_workbook(filename = "connectivity_final_xls.xlsx" ,  use_iterators = True)
+	
+	worksheets = workbook.get_sheet_names()
+	
+	index = 0
+	
+	for worksheet in workbook :    
+	    
+	    for data in worksheet.iter_rows():
+	    
+		if index == 0:        
+		    index = index + 1        
+		    continue
+	    
+		#if index >15:        
+		    #break
+		
+		if data[0].value == None:
+		    break
+    
+		dataValue = [x.value for x in data[1:5]]
+		
+		regionName = data[0].value
+		
+		brainRegionList = BrainRegion.objects.filter (name = regionName )
+		
+		brainRegionDescription = regionName
+		
+		brainRegion = ''
+		
+		if len ( brainRegionList ) > 0 :
+		    
+		    brainRegionDescription = brainRegionList[0].description
+		    
+		    brainRegion = brainRegionList[0]
+		    
+		connectivityValueObj = ConnectivityValueObj()    
+		    
+		connectivityValueObj.targetBrainRegion = brainRegion
+	    
+		connectivityList = []
+	    
+		#print " ********* data line = " + str ( index ) + " value " + str (dataValue)
+	    
+		try:
+
+		    connectivityList = [round(math.log(float(x)),8) for x in dataValue]
+		    
+		except:
+		    pass
+	    
+		#print " after data = " + str (connectivityList)
+    
+		if len (connectivityList)> 0:
+		    
+		    connectivityMatrix.append (connectivityList)
+		    
+		    connectivityValueObj.connectivityListFull = connectivityList	    
+
+		    connectivityValueObjList.append (connectivityValueObj)
+		    
+		    targetRegions.append ( brainRegionDescription  + "-" + str(index))
+		
+		index = index + 1
+	
+	connectivityMatrix = array (connectivityMatrix)
+	connectivityMatrix = connectivityMatrix.transpose()
+	
+	#print " shape " + str (connectivityMatrix.shape)
+	#print " connectivityMatrix = " + str (connectivityMatrix)
+    
+    except:
+
+	traceback.print_exc(file=sys.stdout)
+	    
+    return render_to_response('chronux/brainConnectivity.html', {
+        "connectivityMatrix":connectivityMatrix,
+        "connectivityValueObjList":connectivityValueObjList,        
+        "targetRegions":targetRegions,
+        "projectionRegions":projectionRegions,
+    },  RequestContext(request))  
+
+@login_required
+def uploadFile(request):
+
+    dataFiles = DataFile.objects.all()
+    
+    return render_to_response('chronux/listProjects.html', {
+        "dataFiles":dataFiles,
+    },  RequestContext(request))  
+
+@login_required
+def listFiles(request):
+
+    projectId = request.POST.get("projectId",0 ) 
+
+    #print " project = " + str(projectId)    
+
+    project = Project.objects.get(pk = projectId)
+    
+    contrastMatrixFileType = FileType.objects.filter(name = "contrastMatrix")[0] 
+
+    dataFiles = DataFile.objects.filter ( project = project, fileType = contrastMatrixFileType )
+    
+    return render_to_response('chronux/listFiles.html', {
+        "dataFiles":dataFiles,
+        "project":project,        
+    },  RequestContext(request))  
+
+@login_required
+def submittedJobs(request):
+
+    submittedJobs = SubmittedJob.objects.all()
+    
+    return render_to_response('chronux/submittedJobs.html', {
+        "submittedJobs":submittedJobs,
+    },  RequestContext(request)) 
+
+@login_required
+def listProjects(request):
+
+    projects = Project.objects.all()
+    
+    return render_to_response('chronux/listProjects.html', {
+        "projects":projects,
+    }, RequestContext(request))  
+
+@login_required
+def listSubmittedJobs(request):
+
+    submittedJobs = SubmittedJob.objects.all()
+    
+    return render_to_response('chronux/submittedJobs.html', {
+        "submittedJobs":submittedJobs,
+    }, RequestContext(request))  
+
+@login_required
+def listAnalysisHeaders(request):
+    
+    analysisHeaders = AnalysisHeader.objects.all() 
+    
+    return render_to_response('chronux/listAnalysisHeaders.html', {
+        "analysisHeaders":analysisHeaders,
+    },  RequestContext(request)) 
+
+#@login_required
+#def listAnalysisDetails(request):
+    
+    ##analysisHeaderId = request.POST.get("analysisHeaderId",0 )
+    
+    ##analysisHeader = AnalysisHeader.objects.get(pk = analysisHeaderId)
+
+    ##analysisDetails = AnalysisDetail.objects.filter(analysisHeader = analysisHeader)
+    
+    #return render_to_response('chronux/listAnalysisDetails.html', {
+        ##"analysisDetails":analysisDetails,
+    #},  RequestContext(request))  
+
+@login_required
+def displayFileDetails(request):
+
+    try:
+
+	dataFileId = request.POST.get("dataFileId",0 )
+	
+	dataFile = DataFile.objects.get ( pk = dataFileId)
+	
+	sampleDetailList = SampleDetail.objects.filter (dataFile = dataFile) 
+	
+	#print " sampledetaiList = " + str()
+                
+    except:
+	traceback.print_exc(file=sys.stdout)
+	messages.add_message(request, messages.ERROR, 'Error occurred while fetching details for data file id' + str(dataFileId) )                        
+    
+    return render_to_response('chronux/displayFileDetails.html', {
+        "dataFile":dataFile,
+        #"geneObjList":geneObjList,
+        "sampleDetailList":sampleDetailList,
+    },  RequestContext(request)) 
+
+@login_required
+def fetchAnalysisParameterObj(request):
+
+    combinationObjList = []
+
+    try:
+	
+	#comparisonMethodDifference = ComparisonMethod.objects.filter (name = "Difference")[0]
+	#comparisonMethodFoldChange = ComparisonMethod.objects.filter (name = "Fold Change")[0]
+	
+	for combinationNum in range ( NUM_COMPARISONS):
+	
+	    combinationObj = CombinationObj() 
+	    
+	    combinationObj.combinationNum = combinationNum
+	
+	    combinationObj.combination1String = request.POST.get("combination1String-" + str(combinationNum),False )	
+	    combinationObj.combination2String = request.POST.get("combination2String-" + str(combinationNum),False )
+	    
+	    if not combinationObj.combination1String or not combinationObj.combination2String:
+		continue
+	    
+	    combinationString = combinationObj.combination1String + "_vs_" + combinationObj.combination2String
+	    combinationObj.combinationString = combinationString	    
+
+	    combinationObj.comparisonMethod = comparisonMethodDifference
+	    if combinationObj.combination1String.find("-") != -1 and combinationObj.combination2String.find("-") != -1:
+		combinationObj.comparisonMethod = comparisonMethodFoldChange
+
+	    foldChangeCutOff = 0
+
+	    try:
+		foldChangeCutOff = request.POST.get("foldChangeCutOff-" + str(combinationNum),0 )
+		foldChangeCutOff = float (foldChangeCutOff)
+	    except:
+		foldChangeCutOff = 0  
+		pass
+
+	    pValueCutOff = 0
+	    
+	    try:
+		pValueCutOff = request.POST.get("pValueCutOff-" + str(combinationNum),0 )
+		pValueCutOff = float (pValueCutOff)
+	    except:
+		pValueCutOff = 0		
+		pass
+	    
+	    testStatGreaterThanZero = False  
+	    
+	    try:
+		testStatGreaterThanZeroString = request.POST.get("testStatGreaterThanZero-" + str(combinationNum),0 )
+		
+		if testStatGreaterThanZeroString == "1":
+		    testStatGreaterThanZero = True
+	    except:
+		testStatGreaterThanZero = False  		
+		pass
+	    	
+	    combinationObj.foldChangeCutOff = foldChangeCutOff
+	    combinationObj.pValueCutOff = pValueCutOff
+	    
+	    topTableAdjustMethod = AdjustMethod.objects.filter ( name = 'BH')[0]
+	    
+	    try:
+		topTableAdjustMethodId = request.POST.get("topTableAdjustMethodId-" + str(combinationNum),False )
+		topTableAdjustMethodId = float (topTableAdjustMethodId)
+		topTableAdjustMethod = AdjustMethod.objects.get ( pk = topTableAdjustMethodId)
+	    except:
+		pass	    
+	    
+	    combinationObj.topTableAdjustMethod = topTableAdjustMethod
+	    
+	    #print " adding parameter combination num " + str (combinationNum) + " obj 1 = " + str (combinationObj.combination1String) + " 2 = " + str (combinationObj.combination2String) 
+	    #print " fold change " + str ( foldChangeCutOff ) +  " p value = " + str (pValueCutOff) + " top table adjust method " + str(combinationObj.topTableAdjustMethod)  + " testStatGreaterThanZero " + str (testStatGreaterThanZero)
+	    
+	    combinationObjList.append ( combinationObj ) 
+	    
+    except:
+	traceback.print_exc(file=sys.stdout)
+    
+    return combinationObjList
+
+@login_required
+def sampleDetail(request):
+
+    try:
+	
+	sampleDetailId = request.POST.get("sampleDetailId",0 )
+	
+	#print " sample detail id = " + str(sampleDetailId)
+
+	sampleDetail = SampleDetail.objects.get ( pk = sampleDetailId)	
+	
+	#shutil.copy(sampleDetail.qcQualiMapHTMLPath, "/Users/mitras/projects/webchronux/templates/chronux/.")
+	#shutil.copy(sampleDetail.fastQcHTMLPath, "/Users/mitras/projects/webchronux/templates/chronux/.")
+   
+    except:
+	traceback.print_exc(file=sys.stdout)
+	messages.add_message(request, messages.ERROR, 'Error occurred while fetching details for sample detail id' + str(sampleDetailId) )                        
+    
+    return render_to_response('chronux/sampleDetail.html', {
+
+        "sampleDetail" : sampleDetail,
+
+    },  RequestContext(request)) 
+
+@login_required
+def addProject(request):
+
+    #try:
+	
+	#print " sample detail id = " + str(sampleDetailId)
+   
+    #except:
+	#traceback.print_exc(file=sys.stdout)
+	#messages.add_message(request, messages.ERROR, 'Error occurred while fetching details for sample detail id' + str(sampleDetailId) )                        
+    
+    return render_to_response('chronux/addProject.html', {
+
+    },  RequestContext(request))
+
+@login_required
+def addDataFile(request):
+
+    try:
+	
+	projectId = request.POST.get("projectId",0 ) 
+    
+	project = Project.objects.get(pk = projectId)
+   
+    except:
+	traceback.print_exc(file=sys.stdout)
+    
+    return render_to_response('chronux/addDataFile.html', {
+
+        "sampleDetail" : sampleDetail,
+        "project" : project,
+
+    },  RequestContext(request))
+
+@login_required
+def submitAddProject(request):
+
+    messages = []
+
+    try:
+	
+	projectName = request.POST.get("projectName","" )
+	startDate = request.POST.get("startDate","" )
+	endDate = request.POST.get("endDate","" )
+	
+	project = Project ( name = projectName )
+	project.save()
+	
+	contrastMatrixFileType = FileType.objects.filter(name = "ContrastMatrix")[0] 
+	dataFiles = DataFile.objects.filter ( project = project, fileType = contrastMatrixFileType )	
+	
+    except:
+	traceback.print_exc(file=sys.stdout)
+	messages.add_message(request, messages.ERROR, 'Error occurred while adding project' + str(sampleDetailId) )                        
+
+    return render_to_response('chronux/listFiles.html', {
+            "dataFiles":dataFiles,
+            "project":project,        
+        },  RequestContext(request))  
+
+@login_required
+def submitAddDataFile(request):
+    
+    project = ""
+
+    try:
+
+	projectId = request.POST.get("projectId",0 )
+	
+	project = Project.objects.get (pk = projectId)
+	
+	contrastFileType = FileType.objects.filter(name = "contrastMatrix")[0]
+	qcZipFileType = FileType.objects.filter(name = "qcZipFile")[0]
+	
+	filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(projectId) 
+	
+	if not os.path.isdir( filePath ):
+	    os.mkdir(filePath)
+	
+	dataFileName = request.POST.get("dataFileName","" )
+	dataFileDescription = request.POST.get("dataFileDescription","" )
+	
+	# counts matrix
+	dataFile = request.FILES["countsMatrix"]
+	
+	#print " ***** before read counts matrix "
+	
+	data = [row for row in csv.reader(dataFile.read().split("\n"))]
+	
+	dataList = []
+	
+	outputFile = open(filePath + "/" + str(dataFileName) +".csv", "w")
+	
+	for i, line in enumerate(data):
+		
+	    if len(line) > 0:
+		
+		outputFile.write(",".join(line))
+		outputFile.write("\n")
+
+		#dataList.append(line[0].split("\t"))
+
+	##r = pe.get_records(file_type="xlsx", file_content=content)	
+	#print " ***** !!!!!! after read counts matrix "
+	
+	#df = pd.DataFrame(dataList)
+	#df.to_csv(filePath + "/" + str(dataFileName) +".csv" , index = False, sep=',', header=None, quoting=csv.QUOTE_NONNUMERIC )
+
+	contrastDataFile = DataFile ( name = dataFileName , description = dataFileDescription, project = project, filePath = filePath, fileType = contrastFileType)
+	contrastDataFile.save()
+	
+	# zip file
+	qcFileZip = request.FILES["qcFilesZip"]
+	
+	#if qcFileZip.file is not None and zipfile.is_zipfile(qcFileZip.file):
+
+	zfile = zipfile.ZipFile(qcFileZip)	
+
+	zfile.extractall(filePath )
+	zfile.close()	
+
+	dataFile = DataFile ( name = qcFileZip , description = qcFileZip, project = project, filePath = filePath, fileType = qcZipFileType)
+	dataFile.save()
+	
+	df = pd.DataFrame.from_csv(filePath + "/summary.csv")
+	
+	for index, datarow in df.iterrows():
+	    
+	    sampleNameString = str(index)
+	    
+	    numberOfInputReads = datarow["Number of input reads"]
+	    pctUniquelyMappedReads = datarow['Uniquely mapped reads %'].replace("%","")
+	    pctMappedMultipleLoci = datarow['% of reads mapped to multiple loci'].replace("%","")
+	
+	    pctUnMappedTooManyLoci = datarow['% of reads mapped to too many loci'].replace("%","")
+	    
+	    pctUnMappedTooManyMismatches = datarow['% of reads unmapped: too many mismatches'].replace("%","")
+	    pctUnMappedTooShort = datarow['% of reads unmapped: too short'].replace("%","")
+	    pctUnMappedOther = datarow['% of reads unmapped: other'].replace("%","")	
+	    
+	    totalAlignments = datarow['total alignments']
+	    
+	    sampleName = sampleNameString[:sampleNameString.find("_Log.final.out")]
+	    
+	    qcQualiMapHTMLPath = filePath + "/qc/" + sampleName + "_qualimap/qualimapReport.html"
+	    fastQcHTMLPath = filePath + "/qc/" + sampleName + "_fastqc/" + sampleName + "_fastqc.html"
+	    
+	    sampleDetail = SampleDetail ( sampleName = sampleName, dataFile = contrastDataFile, numberOfInputReads = numberOfInputReads, pctUniquelyMappedReads = pctUniquelyMappedReads, pctMappedMultipleLoci = pctMappedMultipleLoci, pctUnMappedTooManyLoci = pctUnMappedTooManyLoci, pctUnMappedTooManyMismatches = pctUnMappedTooManyMismatches ,  pctUnMappedTooShort = pctUnMappedTooShort  ,  pctUnMappedOther = pctUnMappedOther, totalAlignments = totalAlignments, qcQualiMapHTMLPath = qcQualiMapHTMLPath, fastQcHTMLPath= fastQcHTMLPath )
+	    
+	    sampleDetail.save()    	
+   
+    #except:
+	#traceback.print_exc(file=sys.stdout)
+	##messages.add_message(request, messages.ERROR, 'Error occurred while fetching details for sample detail id' + str(sampleDetailId) )                        
+    
+    #return render_to_response('chronux/submitAddDataFile.html', {
+        #"project":project,
+    #},  RequestContext(request))
+
+	#sampleDetailList = SampleDetail.objects.filter (dataFile = dataFile) 
+	
+	contrastMatrixFileType = FileType.objects.filter(name = "ContrastMatrix")[0] 
+    
+	dataFiles = DataFile.objects.filter ( project = project, fileType = contrastMatrixFileType )	
+                
+    except:
+	traceback.print_exc(file=sys.stdout)
+	messages.add_message(request, messages.ERROR, 'Error occurred while fetching details for data file id' + str(dataFileId) )                        
+    
+    return render_to_response('chronux/listFiles.html', {
+        "project":project,
+        "dataFiles":dataFiles,
+    },  RequestContext(request)) 
+    
+def getAnalysisResultFilterObj(request):
+
+    analysisResultFilterObj = AnalysisResultFilterObj()
+
+    try:
+	
+	try:
+	    analysisResultFilterObj.numRecordsToDisplay = int(request.POST.get("numRecordsToDisplay",0 ))
+	except:
+	    pass
+	try:
+	    analysisResultFilterObj.topTableFoldChangeCutOff = float(request.POST.get("topTableFoldChangeCutOff",0 ))
+	except:
+	    pass
+	try:
+	    analysisResultFilterObj.foldChangeCutOff = float(request.POST.get("foldChangeCutOff",0 ))	
+	except:
+	    pass
+	
+	#print " num records = " + str (analysisResultFilterObj.numRecordsToDisplay)	
+
+	if analysisResultFilterObj.numRecordsToDisplay == 0 and analysisResultFilterObj.topTableFoldChangeCutOff == 0 and analysisResultFilterObj.foldChangeCutOff == 0:
+	    
+	    #print " default num records = " + str (DEFAULT_NUM_RECORDS_TO_DISPLAY)
+	
+	    analysisResultFilterObj.numRecordsToDisplay = DEFAULT_NUM_RECORDS_TO_DISPLAY 
+	    
+    except:
+	
+	traceback.print_exc(file=sys.stdout)
+
+    return analysisResultFilterObj
+
+@login_required
+def downloadDEGData(request):
+    
+    analysisDetailId = request.POST.get("analysisDetailId",0)
+
+    upDownFlag = request.POST.get("upDownFlag","0")
+    contrastNum = request.POST.get("contrastNum",0)
+
+    response = HttpResponse(content_type='text/csv')
+
+    try:
+
+	analysisDetail = AnalysisDetail.objects.get(pk = analysisDetailId) 	
+
+	filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/Analysis_" + str(analysisDetail.id) 
+	
+	analysisPlots = AnalysisPlot.objects.filter(analysisDetail = analysisDetail) 
+	
+	analysisResultFiles = AnalysisResultFile.objects.filter(analysisDetail = analysisDetail) 
+
+	designFactors = DesignFactor.objects.filter(analysisDetail = analysisDetail) 
+	limmaContrasts = LimmaContrast.objects.filter(analysisDetail = analysisDetail) 
+	
+	contrastObjList = []
+	
+	analysisDetailObj = AnalysisDetailObj()
+	
+	analysisDetailObj.analysisDetail = analysisDetail
+	
+	analysisDetailObj.designFactors = designFactors
+	analysisDetailObj.limmaContrasts = limmaContrasts
+	
+	upDownFlagName = ""
+	
+	logFCValue = ""
+	cutOffPValue = ""
+
+	#print " upDownFlag = " + str(upDownFlag) 
+
+	for analysisIndex, analysisResultFile in enumerate(analysisResultFiles):
+	    
+	    #print " analysisIndex = " + str(analysisIndex) + " contrastIndex = " + str(contrastNum)
+	    
+	    if analysisIndex == int(contrastNum):
+	
+		topTableDataFrame = pd.DataFrame.from_csv(analysisResultFile.filePath + ".csv")
+
+		if upDownFlag == "0":
+	    
+		    upDownFlagName = "Up"
+		    
+		    cutOffUpLogFC = float(request.POST.get("cutOffUpLogFC-"+str(analysisIndex),0 ))
+		    cutOffUpPValue = float(request.POST.get("cutOffUpPValue-"+str(analysisIndex),0 ))
+
+		    logFCValue = cutOffUpLogFC
+		    cutOffPValue = cutOffUpPValue
+		    
+		    topTableDataFrame = topTableDataFrame[topTableDataFrame['logFC'] > cutOffUpLogFC] 
+		    topTableDataFrame = topTableDataFrame[topTableDataFrame['adj.P.Val'] < cutOffUpPValue] 
+		    
+		    #print " head = " + str(topTableDataFrame.head())
+
+		elif upDownFlag == "1":
+		
+		    upDownFlagName = "Down"
+
+		    cutOffDownLogFC = float(request.POST.get("cutOffDownLogFC-"+str(analysisIndex),0 ))
+		    cutOffDownPValue = float(request.POST.get("cutOffDownPValue-"+str(analysisIndex),0 ))	
+
+		    logFCValue = cutOffDownLogFC
+		    cutOffPValue = cutOffDownPValue
+    
+		    topTableDataFrame = topTableDataFrame[topTableDataFrame['logFC'] < cutOffDownLogFC] 
+		    topTableDataFrame = topTableDataFrame[topTableDataFrame['adj.P.Val'] < cutOffDownPValue] 		
+		   
+		fileName = filePath + "/DownloadDEGData_" + upDownFlagName + "_logFC_" + str(logFCValue) + "_adj_p_val_"+str(cutOffPValue)+".csv" 
+		
+		response['Content-Disposition'] = 'attachment; filename=%s'%fileName	
+		
+		writer = csv.writer(response,delimiter=",")	
+		
+		writer.writerow(["genes,logFC,AveExpr,t,P.Value,adj.P.Val,B"])		
+		
+		for index, row in topTableDataFrame.iterrows():
+		    
+		    writer.writerow([row["genes"],row["logFC"],row["AveExpr"],row["t"],row["P.Value"],row["adj.P.Val"],row["B"]])
+		    
+		break
+	
+    except:
+	
+	traceback.print_exc(file=sys.stdout)
+
+    return response  	
+
+@login_required
+def displayAnalysisDetail(request):
+    
+    try:
+	
+	analysisDetailId = request.POST.get("analysisDetailId",0 )
+	
+	defaultCutOffPValue = 0.5
+	defaultCutOffLogFC = 1.5
+	
+	analysisDetail = AnalysisDetail.objects.get(pk = analysisDetailId)
+	
+	analysisPlots = AnalysisPlot.objects.filter(analysisDetail = analysisDetail) 
+	analysisResultFiles = AnalysisResultFile.objects.filter(analysisDetail = analysisDetail) 
+
+	designFactors = DesignFactor.objects.filter(analysisDetail = analysisDetail) 
+	limmaContrasts = LimmaContrast.objects.filter(analysisDetail = analysisDetail) 
+	
+	contrastObjList = []
+	
+	analysisDetailObj = AnalysisDetailObj()
+	
+	analysisDetailObj.analysisDetail = analysisDetail
+	
+	analysisDetailObj.designFactors = designFactors
+	analysisDetailObj.limmaContrasts = limmaContrasts
+	
+	outputPath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/Analysis_" + str(analysisDetail.id)	
+	
+	designMatrixFilePath = outputPath + "/designMatrix.csv"
+	contrastMatrixFilePath = outputPath + "/contrastMatrix.csv"	
+
+	designMatrixDf = pd.DataFrame.from_csv(designMatrixFilePath, index_col = None)
+	matrixColumns = designMatrixDf.columns
+	designMatrix = designMatrixDf.as_matrix()
+	
+	contrastMatrixDf = pd.DataFrame.from_csv(contrastMatrixFilePath, index_col = 0)
+	contrastMatrixColumns = contrastMatrixDf.columns
+	contrastMatrix = contrastMatrixDf.as_matrix()
+	
+	contrastMatrixRowObjList = []
+	
+	for rowIndex, row in enumerate ( contrastMatrix ) :
+	    
+	    contrastMatrixRowObj = ContrastMatrixRowObj()
+	    
+	    contrastMatrixRowObj.contrastLevel = matrixColumns [rowIndex]
+	    
+	    contrastMatrixRowObj.contrastMatrixRow = numpy.array(row)
+	    
+	    contrastMatrixRowObjList.append(contrastMatrixRowObj)	
+	
+	for analysisIndex, analysisResultFile in enumerate(analysisResultFiles):
+	    
+	    cutOffUpLogFC = float(request.POST.get("cutOffUpLogFC-"+str(analysisIndex),0 ))
+	    cutOffDownLogFC = float(request.POST.get("cutOffDownLogFC-"+str(analysisIndex),0 ))
+
+	    cutOffUpPValue = float(request.POST.get("cutOffUpPValue-"+str(analysisIndex),0 ))
+	    cutOffDownPValue = float(request.POST.get("cutOffDownPValue-"+str(analysisIndex),0 ))
+	    
+	    if cutOffUpLogFC == 0:
+		cutOffUpLogFC = defaultCutOffLogFC
+
+	    if cutOffDownLogFC == 0:
+		cutOffDownLogFC = -defaultCutOffLogFC
+		
+	    if cutOffUpPValue == 0:
+		cutOffUpPValue = defaultCutOffPValue
+
+	    if cutOffDownPValue == 0:
+		cutOffDownPValue = defaultCutOffPValue
+
+	    contrastObj = ContrastObj()
+	    
+	    contrastObj.contrast = analysisResultFile.resultFileName
+
+	    contrastObj.cutOffUpPValue = cutOffUpPValue
+	    contrastObj.cutOffDownPValue = cutOffDownPValue
+
+	    contrastObj.cutOffUpLogFC = cutOffUpLogFC
+	    contrastObj.cutOffDownLogFC = cutOffDownLogFC
+
+	    #print " cut off up fc " + str(cutOffUpLogFC) 
+	    #print " cut off down fc " + str(cutOffDownLogFC) 
+
+	    #print " cut off up p value " + str(cutOffUpPValue) 
+	    #print " cut off down p value " + str(cutOffDownPValue) 
+	    
+	    topTableDataFrame = pd.DataFrame.from_csv(analysisResultFile.filePath + ".csv")
+	    
+	    topTableUpDataFrame = topTableDataFrame[topTableDataFrame['logFC'] > cutOffUpLogFC] 
+	    #print " for up filter after FC " + str(topTableUpDataFrame.count())
+	    topTableUpDataFrame = topTableUpDataFrame[topTableUpDataFrame['P.Value'] < cutOffUpPValue] 
+	    #print " for up filter after adj p val " + str(topTableUpDataFrame.count())
+
+	    topTableDownDataFrame = topTableDataFrame[topTableDataFrame['logFC'] < cutOffDownLogFC] 
+	    
+	    #print " for down filter after FC " + str(topTableDownDataFrame.head())
+	    topTableDownDataFrame = topTableDownDataFrame[topTableDownDataFrame['P.Value'] < cutOffDownPValue] 
+	    #print " for up filter after adj p val " + str(topTableDownDataFrame.count())	    
+
+	    geneUpList = list(topTableUpDataFrame.sort('logFC',ascending = False).values)
+	    geneDownList = list(topTableDownDataFrame.sort('logFC',ascending = False).values)
+	    
+	    #print " num gene up for contrast " + str(analysisResultFile.resultFileName) + " is " + str(len(geneUpList))
+	    #print " num gene down for contrast " + str(analysisResultFile.resultFileName) + " is " + str(len(geneDownList))
+	    
+	    for geneIndex, data in enumerate ( geneUpList ):
+
+		geneUpObj = GeneInfoObj()
+		
+		if geneIndex > DEFAULT_MAX_LIST_DISPLAY:
+		    
+		    break
+		
+		#print " gene id = " + str(data[0])
+		geneUpObj.geneId = data[0]
+
+		geneUpObj.geneName = data[0]
+		
+		geneUpObj.logFC = data[1]
+		geneUpObj.aveExpr = data[2]
+		geneUpObj.tValue = data[3]
+		geneUpObj.pValue = data[4]
+		geneUpObj.adjustedPValue = data[5]
+		geneUpObj.BValue = data[6]
+		
+		contrastObj.geneUpObjList.append(geneUpObj)
+	    
+	    for geneIndex, data in enumerate ( geneDownList ):
+
+		if geneIndex > DEFAULT_MAX_LIST_DISPLAY:
+		    
+		    break
+		
+		geneDownObj = GeneInfoObj()
+		geneDownObj.geneId = data[0]
+
+		geneDownObj.geneName = data[0]
+		
+		geneDownObj.logFC = data[1]
+		geneDownObj.aveExpr = data[2]
+		geneDownObj.tValue = data[3]
+		geneDownObj.pValue = data[4]
+		geneDownObj.adjustedPValue = data[5]
+		geneDownObj.BValue = data[6]
+		
+		contrastObj.geneDownObjList.append(geneDownObj)
+		
+	    contrastObjList.append(contrastObj)
+	    
+	limmaContrast = LimmaContrast.objects.filter(analysisDetail = analysisDetail)
+    
+    except:
+    
+	traceback.print_exc(file=sys.stdout)    
+    
+    return render_to_response('chronux/analyzeFileResults.html', {
+        "analysisDetail":analysisDetail,
+        "analysisDetailObj":analysisDetailObj,
+        "analysisPlots":analysisPlots,
+        "analysisResultFiles":analysisResultFiles,
+        "limmaContrast":limmaContrast,        
+        "contrastObjList":contrastObjList, 
+        "contrastMatrixRowObjList":contrastMatrixRowObjList,
+        "matrixColumns": matrixColumns,
+        
+        "designMatrix" : designMatrix,
+        
+        "contrastMatrixColumns": contrastMatrixColumns,
+        "contrastMatrix": contrastMatrix,        
+        
+    },  RequestContext(request))  
+
+@login_required
+def submittedJobDetail(request):
+    
+    try:
+	submittedJobId = request.POST.get("submittedJobId",0 )
+    
+	submittedJob = SubmittedJob.objects.get(pk = submittedJobId)
+	
+	completedFlag = True
+
+	#print " ---- completed flag = " + str(completedFlag)
+
+	if not submittedJob.completedTime:
+	    
+	    completedFlag = False
+	    
+	#print " completed flag = " + str(completedFlag)	
+    
+    except:
+    
+	traceback.print_exc(file=sys.stdout)    
+    
+    return render_to_response('chronux/displaySubmittedJob.html', {
+        "submittedJob":submittedJob,
+        "completedFlag":completedFlag,
+    },  RequestContext(request))  
+
+@login_required
+def displaySubmittedJob(request):
+    
+    try:
+	submittedJobId = request.POST.get("submittedJobId",0 )
+    
+	submittedJob = SubmittedJob.objects.get(pk = submittedJobId)
+
+	completedFlag = True
+
+	#print " ---- completed flag = " + str(completedFlag)
+
+	if not submittedJob.completedTime:
+	    
+	    completedFlag = False
+	    
+	#print " completed flag = " + str(completedFlag)
+    
+    except:
+    
+	traceback.print_exc(file=sys.stdout)    
+	
+    return render_to_response('chronux/submittedJobDetail.html', {
+        "submittedJob":submittedJob,
+        "completedFlag":completedFlag,
+    },  RequestContext(request))  
+	
+#@login_required
+#def downloadNormalizedData(request):
+    
+    
+    #response = HttpResponse(content_type='text/csv')
+    #response['Content-Disposition'] = 'attachment; filename="NormalizedData.csv"' 
+
+    #try:
+	
+	#writer = csv.writer(response,delimiter=",")	
+	
+	#analysisDetailId = request.POST.get("analysisDetailId",0)
+	
+	#analysisDetail = AnalysisDetail.objects.get(pk = analysisDetailId) 	
+
+	#filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/Analysis_" + str(analysisDetail.id) 
+	
+	#inFile = open(filePath + "/NormalizedData.csv", "r")
+	
+	#for line in inFile:
+	    
+	    #writer.writerow([line])
+
+    #except:
+    
+	#traceback.print_exc(file=sys.stdout)    
+     
+    #return response  	
+
+@login_required
+def listAnalyses(request):
+    
+    analysisDetailObjList = []
+    
+    try:
+	
+	analysisDetails = AnalysisDetail.objects.all()
+	
+	for analysisDetail in analysisDetails:
+	
+	    analysisDetailObj = AnalysisDetailObj()
+	
+	    analysisDetailObj.analysisDetail = analysisDetail 
+	
+	    submittedJob = SubmittedJob.objects.filter(analysisDetail = analysisDetail)[0]
+	    
+	    analysisDetailObj.completedTime = submittedJob.completedTime
+	    
+	    analysisDetailObjList.append(analysisDetailObj)
+	    
+    except:
+    
+	traceback.print_exc(file=sys.stdout)    
+	
+    return render_to_response('chronux/listAnalyses.html', {
+        "analysisDetailObjList":analysisDetailObjList,
+    },  RequestContext(request))  
+
+@login_required
+def deletePhenotypeFile(request):
+    
+    try:
+	
+	dataFileId = request.POST.get("dataFileId",0)
+	
+	dataFile = DataFile.objects.get(pk = dataFileId)
+	
+	phenotypeFileId = request.POST.get("phenotypeFileId",0)
+	
+	phenotypeFile = DataFile.objects.get(pk = phenotypeFileId) 
+	
+	os.remove(phenotypeFile.filePath + "/" + phenotypeFile.name)
+	
+	phenotypeFile.delete()
+
+    except:
+    
+	traceback.print_exc(file=sys.stdout)    
+	
+    return render_to_response('chronux/confirmDeletePhenotypeFile.html', {
+
+        "dataFile":dataFile,
+        
+    },  RequestContext(request))  
+
+@login_required
+def deleteProjectFiles(request):
+    
+    try:
+	
+	dataFileId = request.POST.get("dataFileId",0)
+	
+	dataFile = DataFile.objects.get(pk = dataFileId)
+	
+	project = dataFile.project
+	
+	qcZipFileType = FileType.objects.filter(name = "qcZipFile")[0]
+	
+	qcZipFile = DataFile.objects.filter(project = project, fileType = qcZipFileType)[0]
+	
+	os.remove(dataFile.filePath + "/" + dataFile.name + ".csv")
+
+	shutil.rmtree(dataFile.filePath + "/qc")
+	os.remove(dataFile.filePath + "/alignment_summary.csv")
+	os.remove(dataFile.filePath + "/summary.csv")
+	
+	analysisDetails = AnalysisDetail.objects.filter( dataFile = dataFile ) 
+	
+	for analysisDetail in analysisDetails :
+	    
+	    shutil.rmtree(dataFile.filePath + "/Project_" + str(project.id) + "/Analysis_" + str(analysis.id))
+	    
+	    analysisDetail.delete()
+	    
+	SampleDetail.objects.filter(dataFile = dataFile).delete()
+    
+	dataFile.delete()
+	qcZipFile.delete()
+
+    except:
+    
+	traceback.print_exc(file=sys.stdout)    
+	
+    return render_to_response('chronux/confirmDeleteFiles.html', {
+        "project":project,
+    },  RequestContext(request))  
+
+@login_required
+def downloadData(request):
+
+    analysisDetailId = request.POST.get("analysisDetailId","0")
+    
+    analysisDetail = AnalysisDetail.objects.get ( pk = analysisDetailId)    
+
+    downloadPhenotypeFile = request.POST.get("downloadPhenotypeFile","0")
+    
+    downloadTopTableResults = request.POST.get("downloadTopTableResults","0")
+    
+    downloadDesignMatrix = request.POST.get("downloadDesignMatrix","0")
+
+    downloadQCData = request.POST.get("downloadQCData","0")
+
+    downloadContrastMatrix = request.POST.get("downloadContrastMatrix","0")    
+
+    downloadCountsMatrix = request.POST.get("downloadCountsMatrix","0")
+
+    downloadNormalizedData = request.POST.get("downloadNormalizedData","0")
+
+    #response = HttpResponse(content_type='text/csv')
+
+    contrastMatrixFileType = FileType.objects.filter(name = "contrastMatrix")[0] 
+
+    contrastMatrixFile = DataFile.objects.filter ( project = analysisDetail.dataFile.project, fileType = contrastMatrixFileType )[0]
+    
+    qcZipFileType = FileType.objects.filter(name = "qcZipFile")[0] 
+
+    qcZipFile = DataFile.objects.filter ( project = analysisDetail.dataFile.project, fileType = qcZipFileType )[0]
+ 
+    phenotypeFileType = FileType.objects.filter(name = "phenotypeFile")[0] 
+
+    phenotypeFile = DataFile.objects.filter ( project = analysisDetail.dataFile.project, fileType = phenotypeFileType)[0]
+ 
+    try:
+
+	analysisDetail = AnalysisDetail.objects.get(pk = analysisDetailId) 	
+
+	filePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/Analysis_" + str(analysisDetail.id)
+	
+	# Open StringIO to grab in-memory ZIP contents
+	s = StringIO.StringIO()
+	
+	# The zip compressor
+	zf = zipfile.ZipFile(s, "w")
+	
+	# Adding files from directory 'files'
+	for root, dirs, files in os.walk(filePath):
+	    for f in files:
+		#print " zipping file " + str(f)
+		zf.write(os.path.join(root, f))
+		
+	#print " downloadCountsMatrix = " + str(downloadCountsMatrix) 
+	#print " downloadPhenotypeFile = " + str(downloadPhenotypeFile) 
+	#print " downloadQCData = " + str(downloadQCData) 
+	
+	if downloadCountsMatrix == "1":
+
+	    zf.write(settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/" + contrastMatrixFile.name + ".csv")
+
+	if downloadPhenotypeFile == "1":
+
+	    zf.write(settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/" + phenotypeFileType.name)
+
+	if downloadQCData== "1":
+
+	    zf.write(settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/" + "alignment_summary.csv")
+	    zf.write(settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/" + "summary.csv")
+
+	    qcFilePath = settings.DATA_OUTPUT_FOLDER + "/Project_" + str(analysisDetail.dataFile.project.id) + "/qc"
+	    
+	    # Adding files from directory 'qc'
+	    for root, dirs, files in os.walk(qcFilePath):
+		for f in files:
+		    #print " zipping file " + str(f)
+		    zf.write(os.path.join(root, f))	    
+	    
+	zf.close()
+	
+	zip_filename = "Outzip_Project_" + str(analysisDetail.dataFile.project.id) + ".zip"
+	
+	# Grab ZIP file from in-memory, make response with correct MIME-type
+	resp = HttpResponse(s.getvalue(), content_type = "application/x-zip-compressed")
+	# ..and correct content-disposition
+	resp['Content-Disposition'] = 'attachment; filename=%s' % zip_filename
+	
+    except:
+	
+	traceback.print_exc(file=sys.stdout)
+
+    return resp 	

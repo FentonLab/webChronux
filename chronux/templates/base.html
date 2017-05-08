@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    	{% load staticfiles %}
+    
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="">
+        <meta name="author" content="">
+        <link rel="shortcut icon" href="../../docs-assets/ico/favicon.png">
+        <title>Chronux time series analysis of EEG data </title>
+    
+        <!-- Bootstrap core CSS -->
+        <link href="{% static "css/bootstrap.css"  %}" rel="stylesheet">
+	<link href="{% static "css/jquery.dataTables.min.css"  %}" rel="stylesheet">	
+        <!-- Custom styles for this template -->
+        <link href="{% static "css/justified-nav.css"  %}" rel="stylesheet">
+	
+        <link href="{% static "css/common.css"  %}" rel="stylesheet" >
+
+	<link href="{% static "css/bokeh-0.11.1.min.css" %}" rel="stylesheet" type="text/css">
+	<link href="{% static "css/bokeh-widgets-0.11.1.min.css" %}" rel="stylesheet" type="text/css"> 
+
+	<link href="{% static "css/jquery-ui.min.css" %}" rel="stylesheet" type="text/css"> 
+	
+        <!-- Bootstrap core JavaScript -->
+
+        <script src="{% static "js/jquery.min.js"  %}" ></script>
+        <script src="{% static "js/jquery-ui.min.js"  %}" ></script>
+
+        <script src="{% static "js/d3.min.js"  %}" ></script>	
+        <script src="{% static "js/bootstrap.min.js"  %}" ></script>
+	<script src="{% static "js/jquery.dataTables.min.js"  %}" ></script>
+
+	<script src="{% static "js/bokeh-0.11.1.min.js" %}"></script>
+	<script src="{% static "js/bokeh-widgets-0.11.1.min.js" %}"></script>	
+	
+       {% block css %} 
+
+       {% endblock css %} 
+
+       {% block js %} 
+
+       {% endblock js %} 
+ 
+    </head>
+    <body>
+        <div class="container">
+            <div class="masthead">
+                <div class="row">
+                    <div class="col-xs-12" style="text-align:center;">
+                        <!-- <a href="/"><img src="{% static "img/logo.gif" %}"width="150" height=""150" /></a> -->
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-12">
+                        <p style="text-align:center;font-weight:bold;font-size:24px;">Time series analysis of EEG data<p/></a>
+                    </div>
+                </div>
+            </div>
+
+	    <nav class="navbar navbar-default">
+	      <div class="container-fluid">
+		<div>
+		  <ul class="nav navbar-nav">
+		    <li {% if selectedMenu == "Home" %} class="active" {% endif %}><a href="/">Home</a></li>
+		    <li {% if selectedMenu == "ListFiles" %} class="active" {% endif %}><a href="/chronux/listProjects">List Projects</a></li>
+		    <li {% if selectedMenu == "JobStatus" %} class="active" {% endif %}><a href="/chronux/listSubmittedJobs">Submitted Jobs</a></li>	
+	            {% if not user.is_authenticated %} 
+		    <li >
+		         <a href="/accounts/login">
+    			Login
+		      </a>
+		    </li>
+		    {% endif %}
+		  </ul>
+		  {% if user.is_authenticated %} 
+		  <ul class="nav pull-right">
+		    <li >
+		         {{user.username}}&nbsp;
+		         <a href="/accounts/logout">
+    			Logout
+		      </a>
+		    </li>
+		  </ul>
+		  {% endif %} 
+		</div>
+	      </div>
+	    </nav>
+	    {% block content %}
+	    {% endblock content %}	  
+            <!-- Site footer -->
+            <div class="footer">
+                <!-- <p>© The Rockefeller University 2016<img src="/static/img/ctsa_logo.gif" /></p> -->
+            </div>
+        </div>
+        <!-- /container -->
+    </body>
+</html>

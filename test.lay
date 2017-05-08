@@ -1,0 +1,84 @@
+[FileInfo]
+File=C:\EEGDATA\x_20150722_142129.edf
+FileType=Lifelines
+ImpedanceCount=34
+ImpedanceFormat=time,freq,Z1,Z2,...,Z34
+SampleRate=250
+[SessionInformation]
+PatientName=x,x 
+MedicalRecordNumber=1261
+DOB=01-JAN-1911
+Gender=Male
+Medications=x
+Operator=x
+Physician=x
+Hospital=NA
+Department=NA
+Phone=NA
+FAX=NA
+RecorderID=BSG_R10005
+microEEGCtrlVersion=
+RecordingStartDate=22-JUL-2015
+RecordingStartTime=14:21:29
+TimeZone=UTC-06:00
+SenderMachineID=BIOSIGNAL
+[ImpedanceMap]
+Z1=C4
+Z2=A2
+Z3=P3
+Z4=P2
+Z5=C3
+Z6=T3
+Z7=O1
+Z8=T5
+Z9=O2
+Z10=CZ
+Z11=F8
+Z12=T6
+Z13=FZ
+Z14=FP2
+Z15=F7
+Z16=FP1
+Z17=P4
+Z18=NA9
+Z19=NA10
+Z20=NA11
+Z21=NA12
+Z22=NA13
+Z23=NA14
+Z24=NA15
+Z25=NA16
+Z26=NA17
+Z27=NA18
+Z28=CH28
+Z29=CH29
+Z30=CH30
+Z31=CH31
+Z32=CH32
+Z33=Gnd
+Z34=Ref
+[Patient]
+First=x
+MI=
+Last=x
+Sex=M
+BirthDate=01/01/11
+ID=1261
+TestDate=07/22/15
+TestTime=14:21:29
+Physician=x
+Technician=x
+Medications=x
+[Comments]
+83.292,0,0,100,Eyes Closed
+121.812,0,0,100,Eye tension START
+209.18,0,0,100,Eyes Closed
+226.94,0,0,100,Eyes Open START
+232.632,0,0,100,Eye tension END
+292.06,0,0,100,Eyes Open END
+304.548,0,0,100,Tower Task START
+509.228,0,0,100,Verbal Learning END
+535.788,0,0,100,Tower Task START
+806.144,0,0,100,Tower Task END
+[Finalstat]
+1=30 Recording ended normally without errors

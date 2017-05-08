@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block css %}
+
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+
+  phenotypeColumnArray = {}
+
+  $(document).ready(function() {
+    $('#phenotypeColumnsTable').DataTable();
+    $('#phenotypeDataTable').DataTable();
+    $('#phenotypeFileTable').DataTable();
+
+  {% for phenotypeColumnObj in phenotypeColumnObjList %}
+  
+    $("#divSelectBaseline-{{phenotypeColumnObj.colName}}").hide();
+  
+  {% endfor %}
+  
+  {% for dfColumn, dfColumnValues in phenotypeColumnMap.items %}
+  
+    phenotypeColumnArray ["{{ dfColumn }}"] = [{% for dfColumnValue in dfColumnValues %} "{{dfColumnValue}}", {% endfor %}];
+  
+  {% endfor %}
+
+  } );
+  
+  function submitDataFileForm(obj){
+      objId = obj.id;
+
+      data = objId.split("-");
+
+      if (data.length > 0){
+
+         dataFileId = data[1];
+
+      }
+
+    $("#dataFileId").val(dataFileId);
+
+    $("#dataFileForm").submit();
+  }
+
+  function showHideBaseLineDiv(obj){
+  
+      objId = obj.id;
+      
+      data = objId.split("-");
+      
+      colName = data[1];
+
+      colValue = $("#" + objId).val()
+      
+      $('#baseline-' + colName).children('option:not(:first)').remove();
+      
+      if (colValue == $("#factorColumnValue").val() ) {
+
+         $("#divSelectBaseline-" + colName).show();
+	 
+	 $.each(phenotypeColumnArray[colName], function(key, value) {
+
+	      $('#baseline-' + colName)
+	      .append($("<option></option>")
+	      .attr("value",value)
+	      .text(value));
+	      });
+
+      }
+      
+      else
+      
+      {
+
+         $("#divSelectBaseline-" + colName).hide();
+	 
+      }
+
+  }
+
+  function validateForm(){
+  
+    <!--var numBaseline = 0;    -->
+  
+  {% for phenotypeColumnObj in phenotypeColumnObjList %}
+  
+    if ( $('#phenotypeColumn-{{phenotypeColumnObj.colName}}').is(':checked') && $('#columnTypeId-{{phenotypeColumnObj.colName}}' ).val() == "" )
+    {
+      alert("Please select a dropdown element if you have checked a checkbox.")
+      return false;
+    }
+
+    if (!$('#phenotypeColumn-{{phenotypeColumnObj.colName}}').is(':checked') && $('#columnTypeId-{{phenotypeColumnObj.colName}}').val() != "" )
+    {
+      alert("Please check the related checkbox if you have selected a value from the dropdown.")
+      return false;
+    }    
+
+    if ($('#columnTypeId-{{phenotypeColumnObj.colName}}').val() == $("#factorColumnValue").val() && $('#baseline-{{phenotypeColumnObj.colName}}').val() == "" )
+    {
+      alert("Please select a baseline for each factor.")
+      return false;
+    }    
+ 
+  {% endfor %}  
+  
+    <!--alert(" 22 : " + numBaseLine);-->
+  
+    <!--if (numBaseLine != 1){-->
+   
+      <!--alert("One baseline factor needs to be selected.");-->
+   
+      <!--return false;-->
+   <!--}-->
+  
+    return true;
+
+  }
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+
+<!-- /.row -->
+<div class="row">
+  <div class="col-lg-12">
+    <h1 class="page-header">Select Files</h1>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /.row -->
+<form method = "post" id="analyzeFileSelectFactorsForm" name="analyzeFileSelectFactorsForm" action="/chronux/analyzeFileSelectFactors/" onsubmit="return validateForm();" >
+ {% csrf_token %} 
+ <input type="hidden" value="{{project.id}}" name="projectId" id ="projectId"/> 
+ <input type="hidden" value="{{dataFile.id}}" name="dataFileId" id ="dataFileId"/> 
+ <input type="hidden" value="{{phenotypeFile.id}}" name="phenotypeFileId" id ="phenotypeFileId"/> 
+ <input type="hidden" value="{{factorColumnType.id}}" name="factorColumnValue" id ="factorColumnValue"/> 
+ <div class="row">  
+ 
+ <!-- select columns -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#phenotypeColumnsPanel">
+	      EDF Files. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div id="phenotypeColumnsPanel" class="panel-collapse collapse in"  style="overflow-y:auto;height:400px;" -webkit-scrollbar>
+       <div  class="panel-body" >      
+           <p>Select EDF Files.</p>  
+        <div class="table-responsive" >
+	  <table id="phenotypeColumnsTable" name="phenotypeColumnsTable" class="display" cellspacing="0" width="100%" >	  
+	   <thead>
+	      <tr >
+                <th>Select</th>
+                <th>File Name</th>
+              </tr>
+           </thead>
+           <tbody>
+           {% for fileName in fileList %}
+             <tr>
+               <td><input type = "checkbox" name = "fileName" id = "fileName-{{fileName}}" value = "{{fileName}}" checked /></td>
+               <td>{{fileName}}</td>
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /. row -->
+ 
+<p class="text-center">
+   <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "submitPhenotypeInfoButton" id="submitPhenotypeInfoButton" >Submit</button>
+</p>
+ 
+</form>
+{% endblock content %}

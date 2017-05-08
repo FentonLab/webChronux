@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+
+  function submitForm(obj){
+    $("#confirmDeleteFilesDetailForm").submit();
+  }
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+
+<!-- /.row -->
+<div class="row">
+  <div class="col-lg-12">
+    <h1 class="page-header">Confirm Delete Files</h1>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /.row -->
+
+<form action="/chronux/listFiles/" enctype="multipart/form-data" method="post" id = "confirmDeleteFilesDetailForm" >
+    {% csrf_token %} 
+ <input type="hidden" value="{{project.id}}" name="projectId" id ="projectId"/>
+ <div class="row">
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+        Confirm Delete Files
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" >
+          <p>
+	    The contrast matrix and QC files have been deleted, along with any analysis completed on those files. You can return to the file list for this project by clicking <a href="#" onclick="javascript:submitForm(this);">here</a>.
+	  </p>
+
+	  </p>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+ </div>
+ <!-- /.row -->
+</form>
+{% endblock content %}

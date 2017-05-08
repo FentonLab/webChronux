@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+
+  var projectNames = [{% for project in projects %}"{{project.name}}",{% endfor %}]
+
+  function submitAddProjectForm(obj){
+  
+    if ($.inArray($('#projectName').val(),  projectNames) > -1 ) {
+    
+      alert("Project name already exists. Please choose another name.");
+      
+      return false;
+    
+    }
+    
+    $("#addProjectForm").submit();
+
+    return true;
+
+  }
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+
+<!-- /.row -->
+<div class="row">
+  <div class="col-lg-12">
+    <h1 class="page-header">Add Project</h1>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /.row -->
+<form id = "addProjectForm" name = "addProjectForm" action="/chronux/submitAddProject/"  enctype="multipart/form-data" method = "post" >
+ {% csrf_token %} 
+ <input type="hidden" value="" name="projectId" id ="projectId"/>
+ <div class="row">
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#addProjectsPanel">
+	       Add Project. (Please click to toggle this panel.)
+	    </a>
+	  </h4>  	  
+
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" id="addProjectsPanel" class="panel-collapse collapse in" style="height:200px;overflow-y:auto;" -webkit-scrollbar>
+	<div>
+	<p><font color = "red">*</font> indicates required field</p>
+
+          <div class="form-group">
+	    <div class="text">
+	      <label>
+		<b>Name:&nbsp;</b><input type="text" value="" name="projectName" id="projectName" value = "" required>&nbsp;<font color = "red">*</font></input>
+	      </label>
+	    </div>
+	    <p class="help-block">Please enter project name.</p>
+	  </div> 
+
+          <div class="form-group">
+	    <div class="text">
+	      <label>
+		<b>Description:&nbsp;</b><textarea rows="1" cols="100" name="projectDescription" id="projectDescription" value = "" ></textarea>
+	      </label>
+	    </div>
+	    <p class="help-block">Please enter project description.</p>
+	  </div> 
+	    
+	</div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+ </div>
+ <!-- /.row -->
+   <p class="text-center">
+
+   <button type="button" class="btn btn-primary btn-lg" value = "0" name = "submitButton" id="submitButton-0" onclick ="javascript:submitAddProjectForm();">Submit</button>
+
+ </p> 
+</form>
+{% endblock content %}

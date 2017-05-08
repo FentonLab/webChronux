@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+
+<!-- /.row -->
+<div class="row">
+  <div class="col-lg-12">
+    <h1 class="page-header">Project Added</h1>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /.row -->
+
+<form action="/pathway/analyzeFileSelectSubmit/" enctype="multipart/form-data" method="post" id = "analyzeFileSelectForm" >
+ {% csrf_token %} 
+ <div class="row">
+  <div class="col-lg-12">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        Submit Add project
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" >
+          <p>
+	    The project has been added. You can return to the project list by clicking <a href="/chronux/listProjects/">here</a>.
+	  </p>
+
+	  </p>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+ </div>
+ <!-- /.row -->
+ 
+</form>
+{% endblock content %}

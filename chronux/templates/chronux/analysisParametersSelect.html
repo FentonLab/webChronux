@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+
+  $(document).ready(function() {
+    
+    $('#designMatrixTable').DataTable({paging:false});
+
+    $('#contrastMatrixTable').DataTable({paging:false});
+
+    $('#contrastMatchTable').DataTable({paging:false});
+    
+  });
+  
+  function submitAnalyzeFileForm(obj){
+
+    $("#analyzeFileSelectFactorsForm").submit();
+  }
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+<form method = "post" id="analyzeFileSelectFactorsForm" name="analyzeFileSelectFactorsForm" action="/chronux/submitAnalysis/">
+    {% csrf_token %} 
+ <input type="hidden" value="{{datafile.id}}" name="dataFileId" id ="dataFileId"/> 
+ <input type="hidden" value="{{phenotypeFileName}}" name="phenotypeFileName" id ="phenotypeFileName"/> 
+ <input type="hidden" value="{{baseline}}" name="baseline" id ="baseline"/> 
+  
+{% for phenotypeColumn in phenotypeColumns %} 
+ <input type="hidden" value="{{phenotypeColumn}}" name="phenotypeColumn" id ="phenotypeColumn"/> 
+{% endfor %}
+
+{% for columnTypeId in columnTypeIds %} 
+ <input type="hidden" value="{{columnTypeId}}" name="columnTypeId" id ="columnTypeId"/> 
+{% endfor %}
+
+{% for contrasts in contrasts %} 
+ <input type="hidden" value="{{contrasts}}" name="contrastString" id ="contrastString"/> 
+{% endfor %}
+ 
+<!-- design matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#designMatrixPanel">
+	      Design Matrix. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:300px;" -webkit-scrollbar>
+       <div id="designMatrixPanel" class="panel-collapse collapse in" >      
+        <div class="table-responsive" >
+	  <p>Design Matrix</p>
+	  <table id="designMatrixTable" name="designMatrixTable" class="display" cellspacing="0" width="100%" >	  
+	   <thead>
+	      <tr >
+		{% for matrixColumn in matrixColumns %}		
+		   <th>{{matrixColumn}}</th>
+		{% endfor %}
+              </tr>
+           </thead>
+           <tbody>
+           {% for designMatrixRow in designMatrix %}
+             <tr>
+		{% for designMatrixColumnValue in designMatrixRow %}		
+		   <th>{{designMatrixColumnValue}}</th>
+		{% endfor %}		      
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /. row -->
+
+<!-- contrast matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#contrastMatrixPanel">
+	      Contrast Matrix. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:300px;" -webkit-scrollbar>
+       <div id="contrastMatrixPanel" class="panel-collapse collapse in" >      
+        <div class="table-responsive" >
+	  <p>Contrast Matrix</p>
+	  <table id="contrastMatrixTable" name="contrastMatrixTable" class="display" cellspacing="0" width="100%" >	  
+	   <thead>
+	      <tr >
+	        <th>Level</th>
+		{% for matrixColumn in contrastMatrixColumns %}		
+		   <th>{{matrixColumn}}</th>
+		{% endfor %}
+              </tr>
+           </thead>
+           <tbody>
+           {% for contrastMatrixRowObj in contrastMatrixRowObjList %}
+             <tr>
+		<td>
+		   {{contrastMatrixRowObj.contrastLevel}}
+		</td>
+		{% for contrastMatrixColumnValue in contrastMatrixRowObj.contrastMatrixRow %}		
+		   <td>{{contrastMatrixColumnValue}}</td>
+		{% endfor %}		      
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /. row -->
+
+<!-- design matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#columnMatchPanel">
+	      Matching columns of contrast matrix and sample names. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:600px;" -webkit-scrollbar>
+       <div id="columnMatchPanel" class="panel-collapse collapse in" >      
+        <p>Please match the phenotype column labels with column headers in the data. If no match is found, please do not select any value in the dropdown list.</p>       
+        <div class="table-responsive" >
+	  <p>Contrasts</p>
+	  <table id="contrastMatchTable" name="contrastMatchTable" class="display" cellspacing="0" width="100%" >	  
+	   <thead>
+	      <tr >
+		<th>Contrast Column</th>
+		<th>Sample Name</th>
+              </tr>
+           </thead>
+           <tbody>
+           {% for matrixColumnMatchObj in matrixColumnMatchObjList %}
+             <tr>
+	       <td>
+		<input type = "hidden" id = "sampleName-{{forloop.counter0}}" name = "sampleName-{{forloop.counter0}}" value = "{{matrixColumnMatchObj.selectedSampleName}}"/>
+		{{matrixColumnMatchObj.selectedSampleName}}
+	       </td>
+	       <td>
+	        <input type = "hidden" id = "dataMatrixColumn-{{forloop.counter0}}" name = "dataMatrixColumn-{{forloop.counter0}}" value = "{{matrixColumnMatchObj.selectedMatrixColumn}}"/>
+		{{matrixColumnMatchObj.selectedMatrixColumn}}
+	       </td>
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  <!--</div>-->
+  <!--<!-- /.col-lg-12 -->
+<!--</div>-->
+<!--<!-- /. row -->
+
+<!--<!-- contrast matrix -->
+ <!--<div class="row">  -->
+  <!--<!--<!-- panel for sites -->  
+  <!--<div class="col-lg-12">-->
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+
+<p class="text-center">
+   <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "analyzeFileSelectFactorSubmitButton" id="analyzeFileSelectFactorSubmitButton" >Show Plots</button>&nbsp;&nbsp;
+</p>
+
+</form>
+{% endblock content %}

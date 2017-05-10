@@ -9,9 +9,19 @@
   phenotypeColumnArray = {}
 
   $(document).ready(function() {
-    $('#phenotypeColumnsTable').DataTable();
+    $('#phenotypeColumnsTable').DataTable(
+    {
+           paging: false 
+    }
+    );
     $('#phenotypeDataTable').DataTable();
     $('#phenotypeFileTable').DataTable();
+
+    $('#selectAllFiles').click ( function()    
+     {        
+       $("input[name='fileName']").prop('checked', $(this).is(':checked'));
+     }
+    ); 
 
   {% for phenotypeColumnObj in phenotypeColumnObjList %}
   
@@ -132,13 +142,11 @@
   <!-- /.col-lg-12 -->
 </div>
 <!-- /.row -->
-<form method = "post" id="analyzeFileSelectFactorsForm" name="analyzeFileSelectFactorsForm" action="/chronux/analyzeFileSelectFactors/" onsubmit="return validateForm();" >
+<form method = "post" id="analyzeFileSelectFactorsForm" name="analyzeFileSelectFactorsForm" action="/chronux/analysisParametersSelect/" >
  {% csrf_token %} 
  <input type="hidden" value="{{project.id}}" name="projectId" id ="projectId"/> 
  <input type="hidden" value="{{dataFile.id}}" name="dataFileId" id ="dataFileId"/> 
- <input type="hidden" value="{{phenotypeFile.id}}" name="phenotypeFileId" id ="phenotypeFileId"/> 
- <input type="hidden" value="{{factorColumnType.id}}" name="factorColumnValue" id ="factorColumnValue"/> 
- <div class="row">  
+  <div class="row">  
  
  <!-- select columns -->
  <div class="row">  
@@ -160,8 +168,7 @@
 	  <table id="phenotypeColumnsTable" name="phenotypeColumnsTable" class="display" cellspacing="0" width="100%" >	  
 	   <thead>
 	      <tr >
-                <th>Select</th>
-                <th>File Name</th>
+		<th>Select<input type="checkbox" value="" name="selectAllFiles" id="selectAllFiles" checked="checked"> </th>    <th>File Name</th>
               </tr>
            </thead>
            <tbody>

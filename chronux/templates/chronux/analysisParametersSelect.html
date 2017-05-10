@@ -10,11 +10,16 @@
 
   $(document).ready(function() {
     
-    $('#designMatrixTable').DataTable({paging:false});
+    $('#datafileTable').DataTable({paging:false});
 
-    $('#contrastMatrixTable').DataTable({paging:false});
-
-    $('#contrastMatchTable').DataTable({paging:false});
+    $('#columnsTable').DataTable({paging:false});
+    
+    $('#selectAllChannels').click ( function()    
+     {        
+       $("input[name='channelLabel']").prop('checked', $(this).is(':checked'));
+     }
+    ); 
+    
     
   });
   
@@ -30,22 +35,10 @@
 {% block content %}
 <form method = "post" id="analyzeFileSelectFactorsForm" name="analyzeFileSelectFactorsForm" action="/chronux/submitAnalysis/">
     {% csrf_token %} 
- <input type="hidden" value="{{datafile.id}}" name="dataFileId" id ="dataFileId"/> 
- <input type="hidden" value="{{phenotypeFileName}}" name="phenotypeFileName" id ="phenotypeFileName"/> 
- <input type="hidden" value="{{baseline}}" name="baseline" id ="baseline"/> 
-  
-{% for phenotypeColumn in phenotypeColumns %} 
- <input type="hidden" value="{{phenotypeColumn}}" name="phenotypeColumn" id ="phenotypeColumn"/> 
-{% endfor %}
-
-{% for columnTypeId in columnTypeIds %} 
- <input type="hidden" value="{{columnTypeId}}" name="columnTypeId" id ="columnTypeId"/> 
-{% endfor %}
-
-{% for contrasts in contrasts %} 
- <input type="hidden" value="{{contrasts}}" name="contrastString" id ="contrastString"/> 
-{% endfor %}
- 
+ <input type="hidden" value="{{project.id}}" name="projectId" id ="projectId"/> 
+  {% for datafile in datafiles %}	
+   <input type="hidden" value="{{datafile.id}}" name="datafileId" id ="datafileId"/>       
+  {% endfor %}
 <!-- design matrix -->
  <div class="row">  
   <!-- panel for sites -->  
@@ -53,82 +46,29 @@
     <div class="panel panel-primary">
       <div class="panel-heading">
       	  <h4 class="panel-title">
-	    <a data-toggle="collapse" data-parent="#panels1" href="#designMatrixPanel">
-	      Design Matrix. (Click to toggle this panel.)
+	    <a data-toggle="collapse" data-parent="#panels1" href="#fileListPanel">
+	      File List. (Click to toggle this panel.)
 	    </a>
 	  </h4>  
       </div>
       <!-- /.panel-heading -->
       <div class="panel-body" style="overflow-y:auto;height:300px;" -webkit-scrollbar>
-       <div id="designMatrixPanel" class="panel-collapse collapse in" >      
+       <div id="fileListPanel" class="panel-collapse collapse in" >      
         <div class="table-responsive" >
-	  <p>Design Matrix</p>
-	  <table id="designMatrixTable" name="designMatrixTable" class="display" cellspacing="0" width="100%" >	  
+	  <p>File List</p>
+	  <table id="datafileTable" name="datafileTable" class="display" cellspacing="0" width="100%" >	  
 	   <thead>
 	      <tr >
-		{% for matrixColumn in matrixColumns %}		
-		   <th>{{matrixColumn}}</th>
-		{% endfor %}
-              </tr>
-           </thead>
-           <tbody>
-           {% for designMatrixRow in designMatrix %}
-             <tr>
-		{% for designMatrixColumnValue in designMatrixRow %}		
-		   <th>{{designMatrixColumnValue}}</th>
-		{% endfor %}		      
-             </tr>
-           {% endfor %}
-           </tbody>
-          </table>
-        </div>
-        <!-- /.table-responsive -->
-       </div>
-      </div>
-      <!-- /.panel-body -->
-    </div>
-    <!-- /.panel -->
-  </div>
-  <!-- /.col-lg-12 -->
-</div>
-<!-- /. row -->
+	
+		   <th>File Name</th>
 
-<!-- contrast matrix -->
- <div class="row">  
-  <!-- panel for sites -->  
-  <div class="col-lg-12">
-    <div class="panel panel-primary">
-      <div class="panel-heading">
-      	  <h4 class="panel-title">
-	    <a data-toggle="collapse" data-parent="#panels1" href="#contrastMatrixPanel">
-	      Contrast Matrix. (Click to toggle this panel.)
-	    </a>
-	  </h4>  
-      </div>
-      <!-- /.panel-heading -->
-      <div class="panel-body" style="overflow-y:auto;height:300px;" -webkit-scrollbar>
-       <div id="contrastMatrixPanel" class="panel-collapse collapse in" >      
-        <div class="table-responsive" >
-	  <p>Contrast Matrix</p>
-	  <table id="contrastMatrixTable" name="contrastMatrixTable" class="display" cellspacing="0" width="100%" >	  
-	   <thead>
-	      <tr >
-	        <th>Level</th>
-		{% for matrixColumn in contrastMatrixColumns %}		
-		   <th>{{matrixColumn}}</th>
-		{% endfor %}
               </tr>
            </thead>
            <tbody>
-           {% for contrastMatrixRowObj in contrastMatrixRowObjList %}
-             <tr>
-		<td>
-		   {{contrastMatrixRowObj.contrastLevel}}
-		</td>
-		{% for contrastMatrixColumnValue in contrastMatrixRowObj.contrastMatrixRow %}		
-		   <td>{{contrastMatrixColumnValue}}</td>
-		{% endfor %}		      
-             </tr>
+   		{% for fileName in datadFileNames %}	
+		<tr>
+		   <td>{{fileName}}</td>
+		  </tr>
            {% endfor %}
            </tbody>
           </table>
@@ -152,33 +92,35 @@
       <div class="panel-heading">
       	  <h4 class="panel-title">
 	    <a data-toggle="collapse" data-parent="#panels1" href="#columnMatchPanel">
-	      Matching columns of contrast matrix and sample names. (Click to toggle this panel.)
+	      Select Columns for spectral analysis. (Click to toggle this panel.)
 	    </a>
 	  </h4>  
       </div>
       <!-- /.panel-heading -->
       <div class="panel-body" style="overflow-y:auto;height:600px;" -webkit-scrollbar>
        <div id="columnMatchPanel" class="panel-collapse collapse in" >      
-        <p>Please match the phenotype column labels with column headers in the data. If no match is found, please do not select any value in the dropdown list.</p>       
+        <p>Please select the columns for spectral analysis.</p>       
         <div class="table-responsive" >
-	  <p>Contrasts</p>
-	  <table id="contrastMatchTable" name="contrastMatchTable" class="display" cellspacing="0" width="100%" >	  
+	  <p>Columns</p>
+	  <table id="columnsTable" name="columnsTable" class="display" cellspacing="0" width="100%" >	  
 	   <thead>
 	      <tr >
-		<th>Contrast Column</th>
-		<th>Sample Name</th>
+		<th>Select <input type="checkbox" value="" name="selectAllChannels" id="selectAllChannels" checked="checked"> </th>
+		<th>Column Label </th>
+		<th>10-20 mapping</th>
               </tr>
            </thead>
            <tbody>
-           {% for matrixColumnMatchObj in matrixColumnMatchObjList %}
+           {% for key, value in channelMap.items %}
+
              <tr>
+		<td><input type = "checkbox" name = "channelLabel" id = "channelLabel-{{value}}" value = "{{value}}" checked /></td>
+
 	       <td>
-		<input type = "hidden" id = "sampleName-{{forloop.counter0}}" name = "sampleName-{{forloop.counter0}}" value = "{{matrixColumnMatchObj.selectedSampleName}}"/>
-		{{matrixColumnMatchObj.selectedSampleName}}
+		  {{ key }}
 	       </td>
 	       <td>
-	        <input type = "hidden" id = "dataMatrixColumn-{{forloop.counter0}}" name = "dataMatrixColumn-{{forloop.counter0}}" value = "{{matrixColumnMatchObj.selectedMatrixColumn}}"/>
-		{{matrixColumnMatchObj.selectedMatrixColumn}}
+		  {{ value }}
 	       </td>
              </tr>
            {% endfor %}
@@ -190,23 +132,104 @@
       </div>
       <!-- /.panel-body -->
     </div>
-    <!-- /.panel -->
-  <!--</div>-->
-  <!--<!-- /.col-lg-12 -->
-<!--</div>-->
-<!--<!-- /. row -->
 
-<!--<!-- contrast matrix -->
- <!--<div class="row">  -->
-  <!--<!--<!-- panel for sites -->  
-  <!--<div class="col-lg-12">-->
-    <!-- /.panel -->
   </div>
   <!-- /.col-lg-12 -->
 </div>
 
+<!-- design matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#parametersPanel">
+	      Enter parameters for spectral analysis. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:800px;" -webkit-scrollbar>
+       <div id="parametersPanel" class="panel-collapse collapse in" >      
+       
+	  <div class="panel-body">
+	    <p>
+	      Please enter parameters for multi-taper spectral analysis. Multi-taper spectral analysis use Slepian functions, which are the solution of the spectral eigenvalue conentration problem. 
+	    </p>
+	    <p>
+	      The total number of tapers used will be 2*timeBandWidth - 1 = 2NW-1 ( unless explicitly mentioned). The spectral analysis will be done using an overlapping moving window on the C*N data ( channels * data points ).
+	    </p>
+	    <div class="form-group">
+	      <label>Lower Frequency (in Hz)</label>
+	      <input class="form-control" name ="lowerFrequency" required>
+	      <p class="help-block">Lower frequency bound for spectral analysis. Frequencies lower than this will not be stored after FFT.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Upper Frequency (in Hz)</label>
+	      <input class="form-control" name ="upperFrequency"  required>
+	      <p class="help-block">Upper frequency bound for spectral analysis. Frequencies higher than this will not be stored after FFT.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Subtract from baseline?</label>
+	      <div class="checkbox">
+		<label>
+		  <input type="checkbox" value="" name="subtractFromBaseLine" id = "subtractFromBaseLine">Subtract from baseline ( same channel )</input>
+		  <label>
+	      </div>
+	       <p class="help-block">The average data will be subtracted from the baseline prior to analysis.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Remove 60 Hz Line Noise?</label>
+	      <div class="checkbox">
+		<label>
+		  <input type="checkbox" value="" name="removeLineNoise" id="removeLineNoise" >Remove 60 Hz Line Noise ( using Thomson F-test )</input>
+		</label>
+	      </div>
+	      <p class="help-block">Remove 60 Hz line noise using the Thomson F-Test.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Frequency Bandwdith (in Hz)</label>
+	      <input class="form-control" type="number" name="bandWidth" id = "bandWidth" oninput="javascript:calculateTapers();" size="512" value="3" min="1" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Time Window for spectral analysis (in seconds)</label>
+	      <input class="form-control" name="timeWindow" id="timeWindow" size="10" oninput="javascript:calculateTapers();" value="5"  step = "any" min="0" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Step Size (sec)</label>
+	      <input class="form-control" name="stepSize" id="stepSize" size="10" oninput="javascript:calculateTapers();" size="2" value= "1" step="any" min="0" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Padding ( for FFT transform )</label>
+	      <input class="form-control" name="padding" id="padding" size="10" oninput="javascript:calculateTapers();" value="1" step="1"  min="0" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Num Tapers</label>
+	      <input class="form-control" name="numTapers" id="numTapers" size="10" oninput="javascript:calculateTapers();" value="5" step="1"  min="0" required>
+	    </div>
+
+       
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+
+
 <p class="text-center">
-   <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "analyzeFileSelectFactorSubmitButton" id="analyzeFileSelectFactorSubmitButton" >Show Plots</button>&nbsp;&nbsp;
+   <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "analyzeFileSelectFactorSubmitButton" id="analyzeFileSelectFactorSubmitButton" >Submit Analysis</button>&nbsp;&nbsp;
 </p>
 
 </form>

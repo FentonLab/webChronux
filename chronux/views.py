@@ -197,18 +197,21 @@ def listDirectoryFiles(request):
         layFileType = FileType.objects.filter(name = "layFile")[0]
 
         # load qc files if available
+        
+        datafileDirectory = ''
 
         try:
 
-            dataFileDirectory = request.POST.get("dataFileDirectory","")
-            fileList = os.listdir(dataFileDirectory)
+            datafileDirectory = request.POST.get("dataFileDirectory","")
+            fileList = os.listdir(datafileDirectory)
             print (fileList)            
             fileList = [x for x in fileList if x.find(".edf") != -1]
             
             print (fileList)
 
         except:
-            pass
+    
+            traceback.print_exc(file=sys.stdout)
 
         edfFileType = FileType.objects.filter(name = "edfFile")[0]
 
@@ -220,6 +223,7 @@ def listDirectoryFiles(request):
     return render(request, 'chronux/listDirectoryFiles.html', {
         "project":project,
         "fileList":fileList,
+        "datafileDirectory" : datafileDirectory,
     })
 
 @login_required
@@ -245,19 +249,29 @@ def analysisParametersSelect(request):
 
     projectId = request.POST.get("projectId",0 )
     
-    datadFileNames = request.POST.getlist("dataFileName")
+    datadFileNames = request.POST.getlist("fileName")
 
     #print " project = " + str(projectId)
 
     project = Project.objects.get(pk = projectId)
 
     edfFileType = FileType.objects.filter(name = "edfFile")[0]
-
-    dataFiles = Datafile.objects.filter ( project = project, fileType = edfFileType )
-
-    return render(request, 'chronux/listFiles.html', {
-        "dataFiles":dataFiles,
+    
+    datafileDirectory = request.POST.get("datafileDirectory","" )
+    
+    fileList = os.listdir(datafileDirectory)
+   # print (fileList)            
+    fileList = [x for x in fileList if x in datadFileNames] 
+    
+    firstFileName = fileList[0]
+    
+    layFileName = firstFileName[:firstFileName.index(".edf")] + ".lay"
+    
+    channelMap, commentsObjList = parseLayFile(datafileDirectory + "/" + layFileName )
+    return render(request, 'chronux/analysisParametersSelect.html', {
+        "datadFileNames":datadFileNames,
         "project":project,
+        "channelMap":channelMap,
     })
 
 
@@ -265,10 +279,13 @@ def analysisParametersSelect(request):
 def parseLayFile(layFileName):
 
     try:
+        
+        print (layFileName)
 
         f = open(layFileName, "r")
         
         impedanceMapFound = False
+        chennalMapFound = False
         patientDataFound = False
         epochDataFound = False
         commentsFound = False
@@ -287,19 +304,26 @@ def parseLayFile(layFileName):
                 impedanceMapFound = True
                 continue
             
-            if line.find("Patient") != -1:
+            if line.find("ChannelMap") != -1:
                 impedanceMapFound = False
+                channelMapFound = True
+                continue            
+            
+            if line.find("Patient") != -1:
+                channelMapFound = False
                 patientDataFound = True
                 continue      
              
             if line.find("Comments") != -1:
                 impedanceMapFound = False
                 patientDataFound = False
+                channelMapFound = False
                 commentsFound = True
                 continue 
               
             if impedanceMapFound:
                 data = line.split("=")
+                print (" ####### data = " + str(data) )
                 channelMap[data[0]] = data[1]
                  
             if patientDataFound:
@@ -326,7 +350,7 @@ def parseLayFile(layFileName):
         
     except:
         traceback.print_exc(file=sys.stdout)
-    return
+    return channelMap, commentsObjList 
 
 
 #@login_required

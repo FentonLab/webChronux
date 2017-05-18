@@ -268,10 +268,26 @@ def analysisParametersSelect(request):
     layFileName = firstFileName[:firstFileName.index(".edf")] + ".lay"
     
     channelMap, commentsObjList = parseLayFile(datafileDirectory + "/" + layFileName )
+    
+    for fileName in fileList:
+        
+        layFileName = fileName[:fileName.index(".edf")] + ".lay"
+        
+        channelMap1, commentsObjList1 = parseLayFile(datafileDirectory + "/" + layFileName )
+        
+        edfFileObj = EDFFileObj () 
+        
+        edfFileObj.fileName = fileName
+        edfFileObj.channelMap = channelMap1
+        edfFileObj.commentsObjList = commentsObjList
+        
+        edfFileObjList.append(edfFileObj)
+        
     return render(request, 'chronux/analysisParametersSelect.html', {
         "datadFileNames":datadFileNames,
         "project":project,
         "channelMap":channelMap,
+        "edfFileObjList":edfFileObjList,
     })
 
 
@@ -330,21 +346,36 @@ def parseLayFile(layFileName):
                 data = line.split("=")
                 patientMap[data[0]] = data[1]
                      
+            #if commentsFound:
+                #print ( str(line) ) 
+                #data = line.split(",")
+                #print ( str(data))
+                #if line.find("START") != -1:
+                    #startFlag = True
+                    #endFlag = False
+                    #commentsObj = CommentsObj()
+                    #commentsObj.startTime = data[0]
+                    #commentString = data[4]
+                    #commentsObj.description = commentString[:commentString.find("START")]
+                #elif line.find("END") != -1:
+                    #commentsObj.endTime = data[0]
+                    #print ( " ########## adding ########### ")
+                    #commentsObjList.append(commentsObj)
+
             if commentsFound:
+                
                 print ( str(line) ) 
                 data = line.split(",")
                 print ( str(data))
-                if line.find("START") != -1:
-                    startFlag = True
-                    endFlag = False
+                
+                if line.find("loss") == -1 and line.find("re-entered") == -1:
+                
                     commentsObj = CommentsObj()
                     commentsObj.startTime = data[0]
                     commentString = data[4]
-                    commentsObj.description = commentString[:commentString.find("START")]
-                elif line.find("END") != -1:
-                    commentsObj.endTime = data[0]
-                    print ( " ########## adding ########### ")
+                    commentsObj.description = commentString
                     commentsObjList.append(commentsObj)
+                    
         print ( "** " + str([ x.startTime + ":: " + x.endTime  for x in commentsObjList ]) ) 
         print ( channelMap )
         

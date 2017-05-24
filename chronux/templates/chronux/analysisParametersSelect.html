@@ -13,6 +13,8 @@
     $('#datafileTable').DataTable({paging:false});
 
     $('#columnsTable').DataTable({paging:false});
+
+    $('#columnsMatchTable').DataTable({paging:false});
     
     $('#selectAllChannels').click ( function()    
      {        
@@ -36,9 +38,6 @@
 <form method = "post" id="analyzeFileSelectFactorsForm" name="analyzeFileSelectFactorsForm" action="/chronux/submitAnalysis/">
     {% csrf_token %} 
  <input type="hidden" value="{{project.id}}" name="projectId" id ="projectId"/> 
-  {% for datafile in datafiles %}	
-   <input type="hidden" value="{{datafile.id}}" name="datafileId" id ="datafileId"/>       
-  {% endfor %}
 <!-- design matrix -->
  <div class="row">  
   <!-- panel for sites -->  
@@ -58,17 +57,15 @@
 	  <p>File List</p>
 	  <table id="datafileTable" name="datafileTable" class="display" cellspacing="0" width="100%" >	  
 	   <thead>
-	      <tr >
-	
-		   <th>File Name</th>
-
+	      <tr>
+		  <th>File Name</th>
               </tr>
            </thead>
            <tbody>
    		{% for fileName in datadFileNames %}	
 		<tr>
 		   <td>{{fileName}}</td>
-		  </tr>
+		 </tr>
            {% endfor %}
            </tbody>
           </table>
@@ -112,10 +109,8 @@
            </thead>
            <tbody>
            {% for key, value in channelMap.items %}
-
              <tr>
-		<td><input type = "checkbox" name = "channelLabel" id = "channelLabel-{{value}}" value = "{{value}}" checked /></td>
-
+		<td><input type = "checkbox" name = "spectrogramChannel" id = "spectrogramChannel-{{value}}" value = "{{value}}" checked /></td>
 	       <td>
 		  {{ key }}
 	       </td>
@@ -132,11 +127,9 @@
       </div>
       <!-- /.panel-body -->
     </div>
-
   </div>
   <!-- /.col-lg-12 -->
 </div>
-
 <!-- design matrix -->
  <div class="row">  
   <!-- panel for sites -->  
@@ -155,7 +148,7 @@
         <p>Please select the columns for cross spectral analysis.</p>       
         <div class="table-responsive" >
 	  <p>Mathcing columns for spectral analysis</p>
-	  <table id="columnsTable" name="columnsTable" class="display" cellspacing="0" width="100%" >	  
+	  <table id="columnsMatchTable" name="columnsTable" class="display" cellspacing="0" width="100%" >	  
 	   <thead>
 	      <tr >
 		<th>Select <input type="checkbox" value="" name="selectAllChannels" id="selectAllChannels" checked="checked"> </th>
@@ -165,23 +158,21 @@
            </thead>
            <tbody>
            {% for key, value in channelMap.items %}
-
              <tr>
-		<td><input type = "checkbox" name = "coherogramChanneName" id = "channelLabel-{{value}}" value = "{{value}}" checked /></td>
-
+		<td><input type = "checkbox" name = "selectCoherogramChannel" id = "selectCoherogramChannel-{{value}}" value = "{{value}}" checked /></td>
 	       <td>
-		<select id = "coherogramChanneName-{{forloop.counter0}}" name = "coherogramChanneName-{{forloop.counter0}}" value="">
-		     <option id = "dataMatrixColumnOptionDefault" name = "dataMatrixColumnOptionDefault" value="">--Select First Channel--</option>
+		<select id = "coherogramChanneName1-{{forloop.counter0}}" name = "coherogramChanneName1-{{forloop.counter0}}" value="">
+		     <option id = "coherogramChanneOption1" name = "coherogramChanneOptionDefault" value="">--Select First Channel--</option>
 		   {% for key1, value1 in channelMap.items %}
-		     <option id = "dataMatrixColumnOption-{{forloop.counter0}}" name = "dataMatrixColumnOption-{{forloop.counter0}}" value="{{channelName}}" {% if dataMatrixColumn == matrixColumnMatchObj.selectedMatrixColumn %} selected {% endif %}>{{value1}}</option>
+		     <option id = "coherogramChanneOption1-{{forloop.counter0}}" name = "coherogramChanneOption1-{{forloop.counter0}}" value="{{channelName}}" >{{value1}}</option>
 		   {% endfor %}
 		 </select>
 	       </td>
 	       <td>
-		<select id = "coherogramChanneName-{{forloop.counter0}}" name = "coherogramChanneName-{{forloop.counter0}}" value="">
-		     <option id = "dataMatrixColumnOptionDefault" name = "dataMatrixColumnOptionDefault" value="">--Select First Channel--</option>
+		<select id = "coherogramChanneName2-{{forloop.counter0}}" name = "coherogramChanneName2-{{forloop.counter0}}" value="">
+		     <option id = "coherogramChanneOption2" name = "coherogramChanneOption2Default" value="">--Select First Channel--</option>
 		   {% for key2, value2 in channelMap.items %}
-		     <option id = "dataMatrixColumnOption-{{forloop.counter0}}" name = "dataMatrixColumnOption-{{forloop.counter0}}" value="{{channelName}}" {% if dataMatrixColumn == matrixColumnMatchObj.selectedMatrixColumn %} selected {% endif %}>{{value2}}</option>
+		     <option id = "coherogramChanneOption2-{{forloop.counter0}}" name = "coherogramChanneOption2-{{forloop.counter0}}" value="{{channelName}}">{{value2}}</option>
 		   {% endfor %}
 		 </select>
 		</td>
@@ -218,14 +209,14 @@
       <br/>
       <p>The edf files are shown below.</p>
 
-      {% for edfFileObj in edfFileObj%}   
+      {% for edfFileObj in edfFileObjList%}   
       
       <div class="panel-group" id="accordion1">
         <div class="panel panel-warning">
 	    <div class="panel-heading">
 	         <h4 class="panel-title">
 	  	   <a data-toggle="collapse" data-parent="#accordion3" href="#contrastPanel-{{forloop.counter0}}">
-	  	   {{ edfFileObj.edfFileName }} </b>&nbsp;(  Please click to toggle this panel. )
+	  	   {{ edfFileObj.fileName }} </b>&nbsp;(  Please click to toggle this panel. )
 	  	   </a>
 	         </h4>
 	    </div>
@@ -249,11 +240,12 @@
 			       <table class="table table-striped table-bordered table-hover" id = "geneUpTable-{{forloop.counter0}}" >
 				 <thead>
 				   <tr>
-				     <th>Channel Name</th>
+				     <th>Column Label</th>
+				     <th>10-20 mapping</th>
 				   </tr>
 				 </thead>
 				 <tbody>
-				   {% for key, value in edfFileObj.channelMap %}
+				   {% for key, value in edfFileObj.channelMap.items %}
 				    <tr class="{% cycle 'odd gradeX' 'even gradeC' %}" >				   
 				      <td>
 					{{key}}
@@ -295,27 +287,24 @@
 				   </tr>
 				 </thead>
 				 <tbody>
-				   {% for commentsObjList in contrastObj.commentsObjListt %}
+				   {% for commentsObj in edfFileObj.commentsObjList %}
 				    <tr class="{% cycle 'odd gradeX' 'even gradeC' %}" >				   
 				 
-				      <td>{{geneDownObj.geneId}}
-					<br/>
-					  <div style="height:50px;overflow-y:auto;" id = "geneDown-{{forloop.parentloop.counter0}}-{{geneDownObj.geneId}}" name = "geneDown-{{forloop.parentloop.counter0}}-{{geneDownObj.geneId}}">
-					  </div>				      
+				      <td>{{commentsObj.startTime}}
 				      </td>
 			      
 				      <td>
-					{{geneDownObj.logFC}}
+					{{commentsObj.description}}
 				      </td>
 				      <td>
-					{{geneDownObj.aveExpr}}
+					<select id = "coherogramChanneName-{{forloop.counter0}}" name = "coherogramChanneName-{{forloop.counter0}}" value="">
+					     <option id = "dataMatrixColumnOptionDefault" name = "dataMatrixColumnOptionDefault" value="">--Select End Comment--</option>
+					   {% for commentsObj in edfFileObj.commentsObjList %}
+					     <option id = "dataMatrixColumnOption-{{forloop.counter0}}" name = "dataMatrixColumnOption-{{forloop.counter0}}" value="{{commentsObj.commentNum}}" {% if dataMatrixColumn == matrixColumnMatchObj.selectedMatrixColumn %} selected {% endif %}>{{commentsObj.description}}</option>
+					   {% endfor %}
+					 </select>				      
 				      </td>
-				      <td>
-					{{geneDownObj.pValue}}
-				      </td>				      
-				      <td>
-					{{geneDownObj.adjustedPValue}}
-				      </td>				      
+			      
 				    </tr>               
 				   {% endfor %}
 				 </tbody>
@@ -327,74 +316,6 @@
 		    </div>
 		    <!-- end down panel -->
 		    
-		    <!-- start scatter panel -->
-		    <div class="panel panel-success" style="overflow-x:auto;">
-			<div class="panel-heading">
-			    <h4 class="panel-title">
-				<a data-toggle="collapse" data-parent="#accordion2" href="#contrastsScatterPanel-{{forloop.counter0}}">
-				  Scatter Plots &nbsp;(  Please click to toggle this panel. )
-				</a>
-			      </h4>
-			</div>
-			<div id="contrastsScatterPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:600px;overflow-y:auto;"  -webkit-scrollbar>
-			    <div class="panel-body">
-			      <p>&nbsp;</p>
-                            
-			      <p>
-
-			      {{ contrastObj.bokehPlotScript | safe }}
-					  <div class="bokeh_plots" id="bokehPlot-{{contrastObj.contrast}}">
-					    {{ contrastObj.bokehPlotDiv | safe }}
-					  </div> <!-- #bokeh_plots -->
-			      
-
-			      </p>
-			      
-			      <p>
-				<img src = "/static/img/plots/{{contrastObj.scatterPlotName}}.png" width="750px" height="600px"/>
-			      </p> 			      
-			   </div>
-			</div>
-		    </div>
-		    <!-- end scatter panel -->		    
-		    
-		    <!-- start heatmap panel -->
-		    <div class="panel panel-success" style="overflow-x:auto;">
-			<div class="panel-heading">
-			    <h4 class="panel-title">
-				<a data-toggle="collapse" data-parent="#accordion2" href="#contrastsHeatMapPanel-{{forloop.counter0}}">
-				  Heat Maps / Cluster Plots &nbsp;(  Please click to toggle this panel. )
-				</a>
-			      </h4>
-			</div>
-			<div id="contrastsHeatMapPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:600px;overflow-y:auto;"  -webkit-scrollbar>
-			    <div class="panel-body">
-			      <p>&nbsp;</p>
-                            
-			      <p>
-				<img src = "/static/img/plots/{{contrastObj.clusterMapName}}.png" width="800px" height="650px"/>
-			      </p> 			      
-			   </div>
-			</div>
-		    </div>
-		    <!-- end scatter panel -->	
-
-		    <div class="form-group">
-		      <div class="text">
-			<label>
-			  <b>Enter custom list:&nbsp;</b>
-			</label>
-			<input  class="form-control" type="file" id ="customGeneListFile-{{forloop.counter0}}" name ="customGeneListFile-{{forloop.counter0}}" value="" />
-		      </div>
-		      <p class="help-block">Please upload custom list for heatmap.</p>
-		    </div>	
-		    
-		   <p>
-		      <button type="submit" class="btn btn-primary btn-lg" value = "1" name = "submitCustomGeneListButton-{{forloop.counter0}}" id="submitCustomGeneListButton--{{forloop.counter0}}" onclick = "javascript:submitCustomGeneList(this);">Draw ClusterMap</button>			     
-		   </p>			      		    
-
-                   </div>
-		  <!-- end contrast panel -->		    
 
 		  </div>
 		  <!-- end panel group -->			  
@@ -410,288 +331,6 @@
 </div>
 </div>
 <!--<!-- /.row -->
-
-
- <div class="row">  
-  <!-- panel for sites -->  
-  <div class="col-lg-12">
-      
-    <!-- Example row of columns -->   
-    <div class="panel panel-primary">
-      <div class="panel-heading">
-	<h4 class="panel-title">
-	  <a data-toggle="collapse" data-parent="#panels1" href="#contrastListPanel">
-	     List of Contrasts </b>&nbsp;( Please click to toggle this panel. )
-	  </a>
-	</h4>
-      </div>
-      <div id="contrastListPanel" class="panel-collapse collapse in">
-            <div class="panel-body" >
-      <br/>
-      <p>The up and down regulated genes for each contrast are shown below. This list is filtered based on the cutoff pValues and log fold change. Default values are used for the filter. If you wish a to use a different set of filter values, please enter them below and refresh the list by clicking the submit button at the bottom of the screen.</p>
-
-      <p>For each gene, the details, if available, will be fetched from the <a href = "http://mygene.info" target="_blank">mygene info</a> service. Information will be automatically updated in a text panel below each gene after the page has finished loading.</p>      
-	  
-      {% for contrastObj in contrastObjList%}   
-      
-      <div class="panel-group" id="accordion1">
-        <div class="panel panel-warning">
-	    <div class="panel-heading">
-	         <h4 class="panel-title">
-	  	   <a data-toggle="collapse" data-parent="#accordion3" href="#contrastPanel-{{forloop.counter0}}">
-	  	   {{ contrastObj.contrast }} </b>&nbsp;(  Please click to toggle this panel. )
-	  	   </a>
-	         </h4>
-	    </div>
-	    <div id="contrastPanel-{{forloop.counter0}}" class="panel-collapse collapse in">
-	      <div class="panel-body">	      
-		  <div class="panel-group" id="accordion2">
-		    <!-- start up panel -->
-		    <div class="panel panel-success" style="overflow-x:auto;">
-			<div class="panel-heading">
-			    <h4 class="panel-title">
-				<a data-toggle="collapse" data-parent="#accordion2" href="#contrastsUpPanel-{{forloop.counter0}}">
-				  Up Regulated Genes &nbsp;(  Please click to toggle this panel. )
-				</a>
-			      </h4>
-			</div>
-			<div id="contrastsUpPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:400px;overflow-y:auto;"  -webkit-scrollbar>
-			    <div class="panel-body">
-			      <p>&nbsp;</p>
-      
-			      <div class="form-group">
-				<div class="text">
-				  <label>
-				    <b>CutOff pValue:&nbsp;</b>
-				  </label>
-				  <input type="text" id ="cutOffUpPValue-{{forloop.counter0}}" name ="cutOffUpPValue-{{forloop.counter0}}" value="{{contrastObj.cutOffUpPValue}}" />
-				</div>
-				<p class="help-block">Please select cutoff pValue to filter lists below.</p>
-			      </div>
-			
-			      <div class="form-group">
-				<div class="text">
-				  <label>
-				    <b>CutOff log FC:&nbsp;</b>
-				  </label>
-				  <input type="text" id ="cutOffUpLogFC-{{forloop.counter0}}" name ="cutOffUpLogFC-{{forloop.counter0}}" value="{{contrastObj.cutOffUpLogFC}}" />
-				</div>
-				<p class="help-block">Please select cutoff logFC to filter lists below.</p>
-			      </div>	
-			      
-			     <p>
-				<button type="submit" class="btn btn-primary btn-lg" value = "1" name = "applyFilterButton-{{forloop.counter0}}" id="applyFilterButton--{{forloop.counter0}}" onclick = "javascript:submitApplyFilter(this);">Apply Filter</button>&nbsp;&nbsp;				     
-				<button type="submit" class="btn btn-primary btn-lg" value = "0" name = "submitDownloadDEGButton" id="submitDownloadDEGButton-0-{{forloop.counter0}}" onclick = "javascript:submitDownloadDEGData(this);" >Download Filtered Records</button>&nbsp;&nbsp;			     
-			     </p>			      
-			
-			      <div class="table-responsive">
-			       <table class="table table-striped table-bordered table-hover" id = "geneUpTable-{{forloop.counter0}}" >
-				 <thead>
-				   <tr>
-				     <th>Gene Name</th>
-				     <th>Log FC (Limma)</th>
-				     <th>Avg Expr (Limma)</th>	
-				     <th>P Value (Limma)</th>					     
-				     <th>Adj. P Value (Limma)</th>	
-				   </tr>
-				 </thead>
-				 <tbody>
-				   {% for geneUpObj in contrastObj.geneUpObjList %}
-				    <tr class="{% cycle 'odd gradeX' 'even gradeC' %}" >				   
-				      <td>
-					{{geneUpObj.geneId}}
-					<br/>
-					  <div style="height:50px;overflow-y:auto;" id = "geneUp-{{forloop.parentloop.counter0}}-{{geneUpObj.geneId}}" name = "geneUp-{{forloop.parentloop.counter0}}-{{geneUpObj.geneId}}"></div>
-				      </td>
-				      <td>
-					{{geneUpObj.logFC}}
-				      </td>
-				      <td>
-					{{geneUpObj.aveExpr}}
-				      </td>
-				      <td>
-					{{geneUpObj.pValue}}
-				      </td>	
-				      <td>
-					{{geneUpObj.adjustedPValue}}
-				      </td>				      
-				    </tr>				   
-				   {% endfor %}
-				 </tbody>
-			       </table>		    
-			     </div>
-
-			   </div>
-			</div>
-			
-		    </div>
-		    <!-- end up panel -->
-		    <!-- start down panel -->
-		    <div class="panel panel-danger" style="overflow-x:auto;">
-			<div class="panel-heading">
-			    <h4 class="panel-title">
-			      <a data-toggle="collapse" data-parent="#accordion2" href="#contrastsDownPanel-{{forloop.counter0}}">            
-				  Down Regulated Genes &nbsp;(  Please click to toggle this panel. )
-			      </a>
-			    </h4>
-			</div>
-			<div id="contrastsDownPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:400px;overflow-y:auto;"  -webkit-scrollbar>
-			  <div class="panel-body"> 
-			      <p>&nbsp;</p>
-      
-			      <div class="form-group">
-				<div class="text">
-				  <label>
-				    <b>CutOff pValue:&nbsp;</b>
-				  </label>
-				  <input type="text" id ="cutOffDownPValue-{{forloop.counter0}}" name ="cutOffDownPValue-{{forloop.counter0}}" value="{{contrastObj.cutOffDownPValue}}" />
-				</div>
-				<p class="help-block">Please select cutoff pValue to filter lists below.</p>
-			      </div>
-			
-			      <div class="form-group">
-				<div class="text">
-				  <label>
-				    <b>CutOff log FC:&nbsp;</b>
-				  </label>
-				  <input type="text" id ="cutOffDownLogFC-{{forloop.counter0}}" name ="cutOffDownLogFC-{{forloop.counter0}}" value="{{contrastObj.cutOffDownLogFC}}" />
-				</div>
-				<p class="help-block">Please select cutoff logFC to filter lists below.</p>
-			      </div>
-			      
-			     <p>
-				<button type="submit" class="btn btn-primary btn-lg" value = "1" name = "applyFilterButton-1" id="applyFilterButton-1-{{forloop.counter0}}" onclick = "javascript:submitApplyFilter(this);">Apply Filter</button>&nbsp;&nbsp;				     
-				<button type="submit" class="btn btn-primary btn-lg" value = "0" name = "submitDownloadDEGButton" id="submitDownloadDEGButton-1-{{forloop.counter0}}" onclick = "javascript:submitDownloadDEGData(this);" >Download Filtered Records</button>&nbsp;&nbsp;			     
-			     </p>	
-			     
-			      <div class="table-responsive">
-			       <table class="table table-striped table-bordered table-hover" id = "geneDownTable-{{forloop.counter0}}" >
-				 <thead>
-				   <tr>
-				     <th>Gene Name</th>
-				     <th>Log FC (Limma)</th>
-				     <th>Avg Expr (Limma)</th>	
-				     <th>P Value (Limma)</th>	
-				     <th>Adj. P Value (Limma)</th>	
-				   </tr>
-				 </thead>
-				 <tbody>
-				   {% for geneDownObj in contrastObj.geneDownObjList %}
-				    <tr class="{% cycle 'odd gradeX' 'even gradeC' %}" >				   
-				 
-				      <td>{{geneDownObj.geneId}}
-					<br/>
-					  <div style="height:50px;overflow-y:auto;" id = "geneDown-{{forloop.parentloop.counter0}}-{{geneDownObj.geneId}}" name = "geneDown-{{forloop.parentloop.counter0}}-{{geneDownObj.geneId}}">
-					  </div>				      
-				      </td>
-			      
-				      <td>
-					{{geneDownObj.logFC}}
-				      </td>
-				      <td>
-					{{geneDownObj.aveExpr}}
-				      </td>
-				      <td>
-					{{geneDownObj.pValue}}
-				      </td>				      
-				      <td>
-					{{geneDownObj.adjustedPValue}}
-				      </td>				      
-				    </tr>               
-				   {% endfor %}
-				 </tbody>
-			       </table>		    
-			     </div>
-			  </div>
-			</div>
-
-		    </div>
-		    <!-- end down panel -->
-		    
-		    <!-- start scatter panel -->
-		    <div class="panel panel-success" style="overflow-x:auto;">
-			<div class="panel-heading">
-			    <h4 class="panel-title">
-				<a data-toggle="collapse" data-parent="#accordion2" href="#contrastsScatterPanel-{{forloop.counter0}}">
-				  Scatter Plots &nbsp;(  Please click to toggle this panel. )
-				</a>
-			      </h4>
-			</div>
-			<div id="contrastsScatterPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:600px;overflow-y:auto;"  -webkit-scrollbar>
-			    <div class="panel-body">
-			      <p>&nbsp;</p>
-                            
-			      <p>
-
-			      {{ contrastObj.bokehPlotScript | safe }}
-					  <div class="bokeh_plots" id="bokehPlot-{{contrastObj.contrast}}">
-					    {{ contrastObj.bokehPlotDiv | safe }}
-					  </div> <!-- #bokeh_plots -->
-			      
-
-			      </p>
-			      
-			      <p>
-				<img src = "/static/img/plots/{{contrastObj.scatterPlotName}}.png" width="750px" height="600px"/>
-			      </p> 			      
-			   </div>
-			</div>
-		    </div>
-		    <!-- end scatter panel -->		    
-		    
-		    <!-- start heatmap panel -->
-		    <div class="panel panel-success" style="overflow-x:auto;">
-			<div class="panel-heading">
-			    <h4 class="panel-title">
-				<a data-toggle="collapse" data-parent="#accordion2" href="#contrastsHeatMapPanel-{{forloop.counter0}}">
-				  Heat Maps / Cluster Plots &nbsp;(  Please click to toggle this panel. )
-				</a>
-			      </h4>
-			</div>
-			<div id="contrastsHeatMapPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:600px;overflow-y:auto;"  -webkit-scrollbar>
-			    <div class="panel-body">
-			      <p>&nbsp;</p>
-                            
-			      <p>
-				<img src = "/static/img/plots/{{contrastObj.clusterMapName}}.png" width="800px" height="650px"/>
-			      </p> 			      
-			   </div>
-			</div>
-		    </div>
-		    <!-- end scatter panel -->	
-
-		    <div class="form-group">
-		      <div class="text">
-			<label>
-			  <b>Enter custom list:&nbsp;</b>
-			</label>
-			<input  class="form-control" type="file" id ="customGeneListFile-{{forloop.counter0}}" name ="customGeneListFile-{{forloop.counter0}}" value="" />
-		      </div>
-		      <p class="help-block">Please upload custom list for heatmap.</p>
-		    </div>	
-		    
-		   <p>
-		      <button type="submit" class="btn btn-primary btn-lg" value = "1" name = "submitCustomGeneListButton-{{forloop.counter0}}" id="submitCustomGeneListButton--{{forloop.counter0}}" onclick = "javascript:submitCustomGeneList(this);">Draw ClusterMap</button>			     
-		   </p>			      		    
-
-                   </div>
-		  <!-- end contrast panel -->		    
-
-		  </div>
-		  <!-- end panel group -->			  
-	      </div>
-	      <!-- end panel body -->			    
-	  </div>
-      </div>     
-   <!--</div>      -->
-  {% endfor %}  	      
-      
-   </div>
-  <!--<!-- /.col-lg-12 -->  
-</div>
-</div>
-<!--<!-- /.row -->
-
 
 <!-- design matrix -->
  <div class="row">  

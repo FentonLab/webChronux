@@ -23,7 +23,7 @@ urlpatterns = [
     url(r'^chronux/listDirectoryFiles/$', listDirectoryFiles, name = 'listDirectoryFiles'),  
     url(r'^chronux/analysisParametersSelect/$', analysisParametersSelect, name = 'analysisParametersSelect'),  
     #url(r'^chronux/displayFileDetails/$', displayFileDetails, name = 'displayFileDetails'),  
-    #url(r'^chronux/submitAnalysis/$', submitAnalysis, name = 'submitAnalysis'),  
+    url(r'^chronux/submitAnalysis/$', submitAnalysis, name = 'submitAnalysis'),  
    
     #url(r'^chronux/listSubmittedJobs/$', listSubmittedJobs, name = 'listSubmittedJobs'),  
     

@@ -54,14 +54,9 @@ class BipolarMontage(models.Model):
         return str(self.channelId1 ) + str(self.channelId2 )    
 
 class Datafile(models.Model):
-    name = models.CharField(max_length=256)
-    description = models.CharField(max_length=512)
-    uploadedBy = models.ForeignKey(User, blank = True, null = True )
-    uploadedDate = models.DateTimeField(blank = True, null = True )
     filePath = models.CharField(max_length=512)    
     fileType = models.ForeignKey(FileType, blank = True, null = True )
     project = models.ForeignKey ( Project ) 
-    leadList = models.ForeignKey(LeadList)
     def __str__(self):
         return self.name
 

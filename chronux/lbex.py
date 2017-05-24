@@ -15,10 +15,8 @@ import numpy, scipy
 import scipy.io
 from numpy import *
 
-
 import subprocess, datetime, time
 import os
-
 
 SECTIONTYPE_TRANSVERSE = "Transverse"
 SECTIONTYPE_SAGITTAL = "Sagittal"

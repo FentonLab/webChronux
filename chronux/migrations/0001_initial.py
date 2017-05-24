@@ -58,9 +58,6 @@ class Migration(migrations.Migration):
             name='Datafile',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', primary_key=True, serialize=False, auto_created=True)),
-                ('name', models.CharField(max_length=256)),
-                ('description', models.CharField(max_length=512)),
-                ('uploadedDate', models.DateTimeField(blank=True, null=True)),
                 ('filePath', models.CharField(max_length=512)),
             ],
         ),
@@ -157,18 +154,8 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='datafile',
-            name='leadList',
-            field=models.ForeignKey(to='chronux.LeadList'),
-        ),
-        migrations.AddField(
-            model_name='datafile',
             name='project',
             field=models.ForeignKey(to='chronux.Project'),
-        ),
-        migrations.AddField(
-            model_name='datafile',
-            name='uploadedBy',
-            field=models.ForeignKey(blank=True, null=True, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='bipolarmontage',

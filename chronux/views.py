@@ -249,7 +249,7 @@ def analysisParametersSelect(request):
 
     projectId = request.POST.get("projectId",0 )
     
-    datadFileNames = request.POST.getlist("fileName")
+    dataFileNames = request.POST.getlist("fileName")
 
     #print " project = " + str(projectId)
 
@@ -260,14 +260,21 @@ def analysisParametersSelect(request):
     datafileDirectory = request.POST.get("datafileDirectory","" )
     
     fileList = os.listdir(datafileDirectory)
+
    # print (fileList)            
-    fileList = [x for x in fileList if x in datadFileNames] 
+    fileList = [x for x in fileList if x in dataFileNames] 
     
+    for fileName in dataFileNames:
+        datafile = Datafile ( filePath = datafileDirectory, fileType = edfFileType, project = project )
+        datafile.save()
+        
     firstFileName = fileList[0]
     
     layFileName = firstFileName[:firstFileName.index(".edf")] + ".lay"
     
     channelMap, commentsObjList = parseLayFile(datafileDirectory + "/" + layFileName )
+    
+    edfFileObjList = []    
     
     for fileName in fileList:
         
@@ -284,13 +291,72 @@ def analysisParametersSelect(request):
         edfFileObjList.append(edfFileObj)
         
     return render(request, 'chronux/analysisParametersSelect.html', {
-        "datadFileNames":datadFileNames,
         "project":project,
         "channelMap":channelMap,
         "edfFileObjList":edfFileObjList,
     })
 
+@login_required
+def submitAnalysis(request):
 
+    projectId = request.POST.get("projectId",0 )
+
+    selectedSpectrogramChannels = request.POST.getlist("fileName") 
+    
+    edfFileType = FileType.objects.filter(name = "edfFile")[0]
+    
+    fileList = os.listdir(datafileDirectory)
+   # print (fileList)            
+    fileList = [x for x in fileList if x in datadFileNames] 
+    
+    firstFileName = fileList[0]
+    
+    layFileName = firstFileName[:firstFileName.index(".edf")] + ".lay"
+    
+    channelMap, commentsObjList = parseLayFile(datafileDirectory + "/" + layFileName )
+    
+    edfFileObjList = []    
+    
+    for fileName in fileList:
+        
+        layFileName = fileName[:fileName.index(".edf")] + ".lay"
+        
+        channelMap1, commentsObjList1 = parseLayFile(datafileDirectory + "/" + layFileName )
+        
+        edfFileObj = EDFFileObj () 
+        
+        edfFileObj.fileName = fileName
+        edfFileObj.channelMap = channelMap1
+        edfFileObj.commentsObjList = commentsObjList
+        
+        edfFileObjList.append(edfFileObj)
+        
+    samplingFrequency = request.POST.get('samplingFrequency', '') 
+    removeLineNoise = request.POST.get('removeLineNoise', False)
+
+    timeWindow = float(request.POST.get('timeWindow', '') )
+    numDataPoints = int ( math.ceil ( timeWindow * samplingFrequency ) ) 
+
+    bandWidth = float ( request.POST.get('bandWidth', '') )
+
+    stepSize = float ( request.POST.get('stepSize', '') )
+    padding = float ( request.POST.get('padding', '') )
+    timeBandWidth = timeWindow * bandWidth
+    numTapers = 2 * timeBandWidth - 1
+        
+    detrendOrFilter =  request.POST.get('detrend', '') 
+
+    reReference =  request.POST.get('subtractFromRefChannel', '') 
+ 
+    sourceLocalization =  request.POST.get('sourceLocalization', False) 
+    computeSpectralDerivatives =  request.POST.get('computeSpectralDerivatives', False) 
+        
+    return render(request, 'chronux/analysisParametersSelect.html', {
+        "datadFileNames":datadFileNames,
+        "project":project,
+        "channelMap":channelMap,
+        "edfFileObjList":edfFileObjList,
+    })
 
 def parseLayFile(layFileName):
 
@@ -313,9 +379,12 @@ def parseLayFile(layFileName):
         channelMap = {}
         patientMap = {}
         
+        commentNum = 0
+        
         for index, line in enumerate(f):
           
             line = line.replace("\n","").replace("\r","").replace("\t","")
+            
             if line.find("ImpedanceMap") != -1:
                 impedanceMapFound = True
                 continue
@@ -371,12 +440,14 @@ def parseLayFile(layFileName):
                 if line.find("loss") == -1 and line.find("re-entered") == -1:
                 
                     commentsObj = CommentsObj()
+                    commentsObj.commentNum = commentNum
+                    commentNum += 1
                     commentsObj.startTime = data[0]
                     commentString = data[4]
                     commentsObj.description = commentString
                     commentsObjList.append(commentsObj)
                     
-        print ( "** " + str([ x.startTime + ":: " + x.endTime  for x in commentsObjList ]) ) 
+        print ( "** " + str([ x.startTime + ":: " + x.description  for x in commentsObjList ]) ) 
         print ( channelMap )
         
     except:

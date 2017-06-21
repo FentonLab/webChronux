@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% block css %}
+<!--<link rel="stylesheet" type="text/css" href="/static/css/default.css">-->
+<!-- <link rel="stylesheet" type="text/css" href="/static/css/nouislider.css"> -->
+<!-- div.demo { padding: 10px !important; }; -->
+{% endblock css%}
+{% block js %}
+
+<script type="text/javascript">
+
+  $(document).ready(function() {
+    
+    $('#datafileTable').DataTable({paging:false});
+
+    $('#columnsTable').DataTable({paging:false});
+
+    $('#columnsMatchTable').DataTable({paging:false});
+    
+    $('#selectAllChannels').click ( function()    
+     {        
+       $("input[name='channelLabel']").prop('checked', $(this).is(':checked'));
+     }
+    ); 
+    
+    
+  });
+  
+  function submitAnalyzeFileForm(obj){
+
+    $("#analyzeFileSelectFactorsForm").submit();
+  }
+
+</script>
+
+{% endblock js %}
+
+{% block content %}
+<form method = "post" id="analyzeFileSelectFactorsForm" name="analyzeFileSelectFactorsForm" action="/chronux/submitAnalysis/">
+    {% csrf_token %} 
+ <input type="hidden" value="{{project.id}}" name="projectId" id ="projectId"/> 
+<!-- design matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#fileListPanel">
+	      File List. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:300px;" -webkit-scrollbar>
+       <div id="fileListPanel" class="panel-collapse collapse in" >      
+        <div class="table-responsive" >
+	  <p>File List</p>
+	  <table id="datafileTable" name="datafileTable" class="display" cellspacing="0" width="100%" >	  
+	   <thead>
+	      <tr>
+		  <th>File Name</th>
+              </tr>
+           </thead>
+           <tbody>
+   		{% for datafile in dataFileList %}	
+		<tr>
+		   <td>{{datafile.filePath}}</td>
+		 </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+    <!-- /.panel -->
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- /. row -->
+
+<!-- design matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#columnMatchPanel">
+	      Select Columns for spectral analysis. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:600px;" -webkit-scrollbar>
+       <div id="columnMatchPanel" class="panel-collapse collapse in" >      
+        <p>Please select the columns for spectral analysis.</p>       
+        <div class="table-responsive" >
+	  <p>Columns</p>
+	  <table id="columnsTable" name="columnsTable" class="display" cellspacing="0" width="100%" >	  
+	   <thead>
+	      <tr >
+		<th>Select <input type="checkbox" value="" name="selectAllChannels" id="selectAllChannels" checked="checked"> </th>
+		<th>Column Label </th>
+		<th>10-20 mapping</th>
+              </tr>
+           </thead>
+           <tbody>
+           {% for key, value in channelMap.items %}
+             <tr>
+		<td><input type = "checkbox" name = "spectrogramChannel" id = "spectrogramChannel-{{value}}" value = "{{value}}" checked /></td>
+	       <td>
+		  {{ key }}
+	       </td>
+	       <td>
+		  {{ value }}
+	       </td>
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+<!-- design matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#columnMatchPanel">
+	      Select Columns for coherency analysis. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:600px;" -webkit-scrollbar>
+       <div id="columnMatchPanel" class="panel-collapse collapse in" >      
+        <p>Please select the columns for cross spectral analysis.</p>       
+        <div class="table-responsive" >
+	  <p>Mathcing columns for spectral analysis</p>
+	  <table id="columnsMatchTable" name="columnsTable" class="display" cellspacing="0" width="100%" >	  
+	   <thead>
+	      <tr >
+		<th>Select <input type="checkbox" value="" name="selectAllChannels" id="selectAllChannels" checked="checked"> </th>
+		<th>First Column</th>
+		<th>Second Column</th>
+              </tr>
+           </thead>
+           <tbody>
+           {% for key, value in channelMap.items %}
+             <tr>
+		<td><input type = "checkbox" name = "selectCoherogramChannel" id = "selectCoherogramChannel-{{value}}" value = "{{value}}"  /></td>
+	       <td>
+		<select id = "coherogramChanneName1-{{forloop.counter0}}" name = "coherogramChanneName1-{{forloop.counter0}}" value="">
+		     <option id = "coherogramChanneOption1" name = "coherogramChanneOptionDefault" value="">--Select First Channel--</option>
+		   {% for key1, value1 in channelMap.items %}
+		     <option id = "coherogramChanneOption1-{{forloop.counter0}}" name = "coherogramChanneOption1-{{forloop.counter0}}" value="{{channelName}}" >{{value1}}</option>
+		   {% endfor %}
+		 </select>
+	       </td>
+	       <td>
+		<select id = "coherogramChanneName2-{{forloop.counter0}}" name = "coherogramChanneName2-{{forloop.counter0}}" value="">
+		     <option id = "coherogramChanneOption2" name = "coherogramChanneOption2Default" value="">--Select First Channel--</option>
+		   {% for key2, value2 in channelMap.items %}
+		     <option id = "coherogramChanneOption2-{{forloop.counter0}}" name = "coherogramChanneOption2-{{forloop.counter0}}" value="{{channelName}}">{{value2}}</option>
+		   {% endfor %}
+		 </select>
+		</td>
+             </tr>
+           {% endfor %}
+           </tbody>
+          </table>
+        </div>
+        <!-- /.table-responsive -->
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+      
+    <!-- Example row of columns -->   
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+	<h4 class="panel-title">
+	  <a data-toggle="collapse" data-parent="#panels1" href="#contrastListPanel">
+	     List of EDF Files </b>&nbsp;( Please click to toggle this panel. )
+	  </a>
+	</h4>
+      </div>
+      <div id="contrastListPanel" class="panel-collapse collapse in">
+            <div class="panel-body" >
+      <br/>
+      <p>The edf files are shown below.</p>
+
+      {% for edfFileObj in edfFileObjList%}   
+      
+      <div class="panel-group" id="accordion1">
+        <div class="panel panel-warning">
+	    <div class="panel-heading">
+	         <h4 class="panel-title">
+	  	   <a data-toggle="collapse" data-parent="#accordion3" href="#contrastPanel-{{forloop.counter0}}">
+	  	   {{ edfFileObj.fileName }} </b>&nbsp;(  Please click to toggle this panel. )
+	  	   </a>
+	         </h4>
+	    </div>
+	    <div id="contrastPanel-{{forloop.counter0}}" class="panel-collapse collapse in">
+	      <div class="panel-body">	      
+		  <div class="panel-group" id="accordion2">
+		    <!-- start up panel -->
+		    <div class="panel panel-success" style="overflow-x:auto;">
+			<div class="panel-heading">
+			    <h4 class="panel-title">
+				<a data-toggle="collapse" data-parent="#accordion2" href="#contrastsUpPanel-{{forloop.counter0}}">
+				  Spectra &nbsp;(  Please click to toggle this panel. )
+				</a>
+			      </h4>
+			</div>
+			<div id="contrastsUpPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:400px;overflow-y:auto;"  -webkit-scrollbar>
+			    <div class="panel-body">
+			      <p>&nbsp;</p>
+			
+			    </div>
+			</div>
+			
+		    </div>
+		    <!-- end up panel -->
+		    <!-- start down panel -->
+		    <div class="panel panel-danger" style="overflow-x:auto;">
+			<div class="panel-heading">
+			    <h4 class="panel-title">
+			      <a data-toggle="collapse" data-parent="#accordion2" href="#contrastsDownPanel-{{forloop.counter0}}">            
+				  Comments &nbsp;(  Please click to toggle this panel. )
+			      </a>
+			    </h4>
+			</div>
+			<div id="contrastsDownPanel-{{forloop.counter0}}" class="panel-collapse collapse in" style="height:400px;overflow-y:auto;"  -webkit-scrollbar>
+			  <div class="panel-body"> 
+			      <p>&nbsp;</p>
+
+			      <div class="table-responsive">
+			       <table class="table table-striped table-bordered table-hover" id = "geneDownTable-{{forloop.counter0}}" >
+				 <thead>
+				   <tr>
+				     <th>Select</th>
+				     <th>Comment Start</th>
+				     <th>Comment</th>
+				     <th>End Comment</th>	
+				   </tr>
+				 </thead>
+				 <tbody>
+				   {% for commentsObj in edfFileObj.commentsObjList %}
+				    <tr class="{% cycle 'odd gradeX' 'even gradeC' %}" >				   
+				 
+				      <td>
+				      <input type = "checkbox" name = "selectComment" id = "selectComment-{{commentsObj.commentNum}}" value = "{{value}}" checked />
+				      </td>
+				 
+				      <td>{{commentsObj.startTime}}
+				      </td>
+			      
+				      <td>
+					{{commentsObj.description}}
+				      </td>
+				      
+				      <td>
+					<select id = "coherogramChanneName-{{forloop.counter0}}" name = "coherogramChanneName-{{forloop.counter0}}" value="">
+					     <option id = "dataMatrixColumnOptionDefault" name = "dataMatrixColumnOptionDefault" value="">--Select End Comment--</option>
+					   {% for commentsObj in edfFileObj.commentsObjList %}
+					     <option id = "dataMatrixColumnOption-{{forloop.counter0}}" name = "dataMatrixColumnOption-{{forloop.counter0}}" value="{{commentsObj.commentNum}}">{{commentsObj.description}}</option>
+					   {% endfor %}
+					 </select>				      
+				      </td>
+			      
+				    </tr>               
+				   {% endfor %}
+				 </tbody>
+			       </table>		    
+			     </div>
+			  </div>
+			</div>
+
+		    </div>
+		    <!-- end down panel -->
+		    
+
+		  </div>
+		  <!-- end panel group -->			  
+	      </div>
+	      <!-- end panel body -->			    
+	  </div>
+      </div>     
+   <!--</div>      -->
+  {% endfor %}  	      
+      
+   </div>
+  <!--<!-- /.col-lg-12 -->  
+</div>
+</div>
+<!--<!-- /.row -->
+
+<!-- design matrix -->
+ <div class="row">  
+  <!-- panel for sites -->  
+  <div class="col-lg-12">
+    <div class="panel panel-primary">
+      <div class="panel-heading">
+      	  <h4 class="panel-title">
+	    <a data-toggle="collapse" data-parent="#panels1" href="#parametersPanel">
+	      Enter parameters for spectral analysis. (Click to toggle this panel.)
+	    </a>
+	  </h4>  
+      </div>
+      <!-- /.panel-heading -->
+      <div class="panel-body" style="overflow-y:auto;height:800px;" -webkit-scrollbar>
+       <div id="parametersPanel" class="panel-collapse collapse in" >      
+       
+	  <div class="panel-body">
+	    <p>
+	      Please enter parameters for multi-taper spectral analysis. Multi-taper spectral analysis use Slepian functions, which are the solution of the spectral eigenvalue conentration problem. 
+	    </p>
+	    <p>
+	      The total number of tapers used will be 2*timeBandWidth - 1 = 2NW-1 ( unless explicitly mentioned). The spectral analysis will be done using an overlapping moving window on the C*N data ( channels * data points ).
+	    </p>
+	    <div class="form-group">
+	      <label>Lower Frequency (in Hz)</label>
+	      <input class="form-control" name ="lowerFrequency" required>
+	      <p class="help-block">Lower frequency bound for spectral analysis. Frequencies lower than this will not be stored after FFT.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Upper Frequency (in Hz)</label>
+	      <input class="form-control" name ="upperFrequency"  required>
+	      <p class="help-block">Upper frequency bound for spectral analysis. Frequencies higher than this will not be stored after FFT.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Subtract from baseline?</label>
+	      <div class="checkbox">
+		<label>
+		  <input type="checkbox" value="" name="subtractFromBaseLine" id = "subtractFromBaseLine">Subtract from baseline ( same channel )</input>
+		  <label>
+	      </div>
+	       <p class="help-block">The average data will be subtracted from the baseline prior to analysis.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Remove 60 Hz Line Noise?</label>
+	      <div class="checkbox">
+		<label>
+		  <input type="checkbox" value="" name="removeLineNoise" id="removeLineNoise" >Remove 60 Hz Line Noise ( using Thomson F-test )</input>
+		</label>
+	      </div>
+	      <p class="help-block">Remove 60 Hz line noise using the Thomson F-Test.</p>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Frequency Bandwdith (in Hz)</label>
+	      <input class="form-control" type="number" name="bandWidth" id = "bandWidth" oninput="javascript:calculateTapers();" size="512" value="3" min="1" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Time Window for spectral analysis (in seconds)</label>
+	      <input class="form-control" name="timeWindow" id="timeWindow" size="10" oninput="javascript:calculateTapers();" value="5"  step = "any" min="0" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Step Size (sec)</label>
+	      <input class="form-control" name="stepSize" id="stepSize" size="10" oninput="javascript:calculateTapers();" size="2" value= "1" step="any" min="0" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Padding ( for FFT transform )</label>
+	      <input class="form-control" name="padding" id="padding" size="10" oninput="javascript:calculateTapers();" value="1" step="1"  min="0" required>
+	    </div>
+
+	    <div class="form-group">
+	      <label>Num Tapers</label>
+	      <input class="form-control" name="numTapers" id="numTapers" size="10" oninput="javascript:calculateTapers();" value="5" step="1"  min="0" required>
+	    </div>
+
+       </div>
+      </div>
+      <!-- /.panel-body -->
+    </div>
+
+  </div>
+  <!-- /.col-lg-12 -->
+</div>
+
+
+<p class="text-center">
+   <button type="submit" class="btn btn-primary btn-lg" value = "0" name = "analyzeFileSelectFactorSubmitButton" id="analyzeFileSelectFactorSubmitButton" >Submit Analysis</button>&nbsp;&nbsp;
+</p>
+
+</form>
+{% endblock content %}

@@ -18,7 +18,7 @@
     
     $('#selectAllChannels').click ( function()    
      {        
-       $("input[name='channelLabel']").prop('checked', $(this).is(':checked'));
+       $("input[name='spectrogramChannel']").prop('checked', $(this).is(':checked'));
      }
     ); 
     
@@ -62,9 +62,9 @@
               </tr>
            </thead>
            <tbody>
-   		{% for fileName in datadFileNames %}	
+   		{% for datafile in dataFileList %}	
 		<tr>
-		   <td>{{fileName}}</td>
+		   <td>{{datafile.filePath}}</td>
 		 </tr>
            {% endfor %}
            </tbody>
@@ -138,7 +138,7 @@
       <div class="panel-heading">
       	  <h4 class="panel-title">
 	    <a data-toggle="collapse" data-parent="#panels1" href="#columnMatchPanel">
-	      Select Columns for coherency analysis. (Click to toggle this panel.)
+	      Matching columns for spectral analysis. (Click to toggle this panel.)
 	    </a>
 	  </h4>  
       </div>
@@ -147,7 +147,19 @@
        <div id="columnMatchPanel" class="panel-collapse collapse in" >      
         <p>Please select the columns for cross spectral analysis.</p>       
         <div class="table-responsive" >
-	  <p>Mathcing columns for spectral analysis</p>
+
+	    <div class="form-group">
+	      <label> <input type="checkbox" class="form-control" name ="calculateDwpli" >&nbsp;Calculate dWPLI (weighted phase lag index)?</label>
+	      <p class="help-block">Please indicate if the weighted phase lag index is to be calculated.</p>
+	    </div>	  
+
+	    <div class="form-group">
+	     {% for key, value in eegBandMap.items %}
+	      <label> <input type="checkbox" class="form-control" name ="eegBand" id = "eegBand-{{forloop.counter0}}" >&nbsp;{{key}}&nbsp;({{value}})</label>
+	     {% endfor %}
+	      <p class="help-block">Please select the EEG Bands of interest.</p>
+	    </div>	  
+
 	  <table id="columnsMatchTable" name="columnsTable" class="display" cellspacing="0" width="100%" >	  
 	   <thead>
 	      <tr >
@@ -157,22 +169,22 @@
               </tr>
            </thead>
            <tbody>
-           {% for key, value in channelMap.items %}
+           {% for bipolarObj in bipolarObjList %}
              <tr>
-		<td><input type = "checkbox" name = "selectCoherogramChannel" id = "selectCoherogramChannel-{{value}}" value = "{{value}}" checked /></td>
+		<td><input type = "checkbox" name = "coherogramChannel" id = "coherogramChannel-{{forloop.counter0}}" value = "{{forloop.counter0}}"  checked /></td>
 	       <td>
-		<select id = "coherogramChanneName1-{{forloop.counter0}}" name = "coherogramChanneName1-{{forloop.counter0}}" value="">
+		<select id = "coherogramChanneName1-{{forloop.counter0}}" name = "coherogramChanneName1" value="">
 		     <option id = "coherogramChanneOption1" name = "coherogramChanneOptionDefault" value="">--Select First Channel--</option>
 		   {% for key1, value1 in channelMap.items %}
-		     <option id = "coherogramChanneOption1-{{forloop.counter0}}" name = "coherogramChanneOption1-{{forloop.counter0}}" value="{{channelName}}" >{{value1}}</option>
+		     <option id = "coherogramChanneOption1-{{forloop.counter0}}" name = "coherogramChanneOption1-{{forloop.counter0}}" value="{{value1}}"  {% if value1 == bipolarObj.channel1 %} selected {% endif %}>{{value1}}</option>
 		   {% endfor %}
 		 </select>
 	       </td>
 	       <td>
 		<select id = "coherogramChanneName2-{{forloop.counter0}}" name = "coherogramChanneName2-{{forloop.counter0}}" value="">
-		     <option id = "coherogramChanneOption2" name = "coherogramChanneOption2Default" value="">--Select First Channel--</option>
+		     <option id = "coherogramChanneOption2" name = "coherogramChanneOption2Default" value="" >--Select First Channel--</option>
 		   {% for key2, value2 in channelMap.items %}
-		     <option id = "coherogramChanneOption2-{{forloop.counter0}}" name = "coherogramChanneOption2-{{forloop.counter0}}" value="{{channelName}}">{{value2}}</option>
+		     <option id = "coherogramChanneOption2-{{forloop.counter0}}" name = "coherogramChanneOption2-{{forloop.counter0}}" value="{{value2}}"  {% if value2 == bipolarObj.channel2 %} selected {% endif %}>{{value2}}</option>
 		   {% endfor %}
 		 </select>
 		</td>
@@ -281,6 +293,7 @@
 			       <table class="table table-striped table-bordered table-hover" id = "geneDownTable-{{forloop.counter0}}" >
 				 <thead>
 				   <tr>
+				     <th>Select</th>
 				     <th>Comment Start</th>
 				     <th>Comment</th>
 				     <th>End Comment</th>	
@@ -290,17 +303,22 @@
 				   {% for commentsObj in edfFileObj.commentsObjList %}
 				    <tr class="{% cycle 'odd gradeX' 'even gradeC' %}" >				   
 				 
+				      <td>
+				      <input type = "checkbox" name = "selectComment" id = "selectComment-{{commentsObj.commentNum}}" value = "{{value}}" checked />
+				      </td>
+				 
 				      <td>{{commentsObj.startTime}}
 				      </td>
 			      
 				      <td>
 					{{commentsObj.description}}
 				      </td>
+				      
 				      <td>
 					<select id = "coherogramChanneName-{{forloop.counter0}}" name = "coherogramChanneName-{{forloop.counter0}}" value="">
 					     <option id = "dataMatrixColumnOptionDefault" name = "dataMatrixColumnOptionDefault" value="">--Select End Comment--</option>
 					   {% for commentsObj in edfFileObj.commentsObjList %}
-					     <option id = "dataMatrixColumnOption-{{forloop.counter0}}" name = "dataMatrixColumnOption-{{forloop.counter0}}" value="{{commentsObj.commentNum}}" {% if dataMatrixColumn == matrixColumnMatchObj.selectedMatrixColumn %} selected {% endif %}>{{commentsObj.description}}</option>
+					     <option id = "dataMatrixColumnOption-{{forloop.counter0}}" name = "dataMatrixColumnOption-{{forloop.counter0}}" value="{{commentsObj.commentNum}}">{{commentsObj.description}}</option>
 					   {% endfor %}
 					 </select>				      
 				      </td>
@@ -355,6 +373,13 @@
 	    <p>
 	      The total number of tapers used will be 2*timeBandWidth - 1 = 2NW-1 ( unless explicitly mentioned). The spectral analysis will be done using an overlapping moving window on the C*N data ( channels * data points ).
 	    </p>
+	    
+	    <div class="form-group">
+	      <label>Sampling Frequency (in Hz)</label>
+	      <input class="form-control" name ="samplingFrequency" required>
+	      <p class="help-block">Sampling frequency of recording.</p>
+	    </div>
+	    
 	    <div class="form-group">
 	      <label>Lower Frequency (in Hz)</label>
 	      <input class="form-control" name ="lowerFrequency" required>

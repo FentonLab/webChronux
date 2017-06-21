@@ -19,7 +19,7 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-PROJECT_BASE_FOLDER = BASE_DIR + "/webchronux"
+PROJECT_BASE_FOLDER = BASE_DIR 
 
 DATA_OUTPUT_FOLDER = BASE_DIR + "/data"
 

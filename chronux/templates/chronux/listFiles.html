@@ -152,18 +152,16 @@
 	  <table id="dataFileTable" class="display" cellspacing="0" width="100%">
 	   <thead>
 	      <tr >
-		<th>Name</a></th>
-		<th>Description</a></th>
-		<th>Details</a></th>	
-		<th>Delete</a></th>			
-		<th>Analyze</a></th>			
+		<th>Path</th>
+		<th>Details</th>	
+		<th>Delete</th>			
+		<th>Analyze</th>			
               </tr>
            </thead>
            <tbody>
            {% for dataFile in dataFiles %}
              <tr>
-               <td> {{ dataFile.name }}  </td>
-	       <td>{{ dataFile.description }}</td>
+               <td> {{ dataFile.filePath }}  </td>
                <td><button type="button" class="btn btn-primary" id = "dataFileButton-{{dataFile.id}}" name = "dataFileButton-{{dataFile.id}}" onclick ="javascript:submitDataFileForm(this);">Details </button></td>
                <td><button type="button" class="btn btn-warning" id = "dataFileButton-{{dataFile.id}}" name = "dataFileButton-{{dataFile.id}}" onclick ="javascript:submitDeleteFiles(this);">Delete</button></td>
                <td><button type="button" class="btn btn-primary" id = "dataFileButton-{{dataFile.id}}" name = "dataFileButton-{{dataFile.id}}" onclick ="javascript:submitAnalyzeDataFileForm(this);">Analyze File</button></td>

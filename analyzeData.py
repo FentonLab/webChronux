@@ -10,12 +10,12 @@ import traceback
 import mne
 from multitaper import *
 
-samplingFrequency = 256
-upperFrequency = 100
+samplingFrequency = 250
+upperFrequency = 70
 lowerFrequency = 1
 timeBandWidth = 3
-numTapers = 5
-timeWindow = 3 # time window in seconds
+numTapers = 2
+timeWindow = 5 # time window in seconds
 STEP_SIZE = 2 # in seconds
 numDataPoints =  timeWindow * samplingFrequency
 stepSize = STEP_SIZE * samplingFrequency
@@ -26,7 +26,7 @@ def getGridIndices():
 
   try:
 
-     if upperFrequency and lowerFrequency:
+    if upperFrequency and lowerFrequency:
         paddedNumDataPoints = int ( pow ( 2, ceil ( np.log2 ( numDataPoints ) ) + padding ) )
 
         frequencyResolution = float ( samplingFrequency ) / float ( paddedNumDataPoints )
@@ -46,16 +46,16 @@ def getGridIndices():
               lowerFrequencyGrid = int(gridIndices [0][0])
 
   except:
-         traceback.print_exc(file=sys.stdout)
+    traceback.print_exc(file=sys.stdout)
   print ( " grid indices = " + str(gridIndices))
   return int(lowerFrequencyGrid), int(upperFrequencyGrid) , gridIndices
 
-def analyzeEDFData():
+def analyzeEDFData(filePath):
 
  try:
 
   print ( " in analyze data ")
-  f = pyedflib.EdfReader("data/test.edf")
+  f = pyedflib.EdfReader(filePath)
   n = f.signals_in_file
 
   signal_labels = f.getSignalLabels()
@@ -78,17 +78,17 @@ def analyzeEDFData():
 
   for channelIndex in range(n):
 
-     spectrogramData = []
+    spectrogramData = []
 
-     channelData = f.readSignal(channelIndex)
+    channelData = f.readSignal(channelIndex)
 
-     #numWindows = round ( len(channelData) / numDataPoints ) + 1
+    #numWindows = round ( len(channelData) / numDataPoints ) + 1
 
-     numWindows = int ( ( len ( channelData ) - numDataPoints + 1) / ( stepSize  ) )
+    numWindows = int ( ( len ( channelData ) - numDataPoints + 1) / ( stepSize  ) )
 
-     print ( " numWindows = " + str(numWindows) )
+    print ( " numWindows = " + str(numWindows) )
 
-     for windowNum in range ( numWindows ) :
+    for windowNum in range ( numWindows ) :
 
         beginWin = windowNum * numDataPoints * STEP_SIZE
         endWin = beginWin + numDataPoints
@@ -101,27 +101,27 @@ def analyzeEDFData():
 
         if len(windowData) == 0:
 
-           break
+          break
 
         for taperIndex, taper in enumerate ( tapers ) :
 
-           taperData = [float(a*b) for a,b in zip(windowData,taper)]
+          taperData = [float(a*b) for a,b in zip(windowData,taper)]
+          
+          fftData = fft(taperData,paddedNumDataPoints)
 
-           fftData = fft(taperData,paddedNumDataPoints)
+          spectrumChannelData = np.array([log(abs(x*conj(x))) for x in fftData])
 
-           spectrumChannelData = np.array([log(abs(x*conj(x))) for x in fftData])
+          print ( " padded num = " + str(paddedNumDataPoints) + " spectrum len = " + str(len(spectrumChannelData)))
 
-           print ( " padded num = " + str(paddedNumDataPoints) + " spectrum len = " + str(len(spectrumChannelData)))
+          spectrumChannelData = list(spectrumChannelData[gridIndices])
 
-           spectrumChannelData = list(spectrumChannelData[gridIndices])
+          spectrumChannelData = (1 / float(samplingFrequency) ) * np.array(spectrumChannelData)
+          spectrumChannelData = spectrumChannelData[lowerFrequency:upperFrequency+1]
 
-           spectrumChannelData = (1 / float(samplingFrequency) ) * np.array(spectrumChannelData)
-           spectrumChannelData = spectrumChannelData[lowerFrequency:upperFrequency+1]
+          #print (spectrumChannelData)
 
-           #print (spectrumChannelData)
-
-           #print (" for taper = " + str(taperIndex ) + "  spectrumChannelData = " + str(spectrumChannelData) )
-           spectrumChannelSumData = spectrumChannelSumData + array(spectrumChannelData)
+          #print (" for taper = " + str(taperIndex ) + "  spectrumChannelData = " + str(spectrumChannelData) )
+          spectrumChannelSumData = spectrumChannelSumData + array(spectrumChannelData)
 
         spectrumChannelAvgData = np.array( spectrumChannelSumData ) / numTapers
 
@@ -133,38 +133,38 @@ def analyzeEDFData():
 
         #break
 
-     np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
-     #print (spectrogramData)
+    np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
+    print (spectrogramData)
 
-     np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
-     spectrumPSD = [float(sum(col))/len(col) for col in zip(*spectrogramData)]
-     spectrumPSD = np.array(spectrumPSD)/100
-     np.savetxt("outdata/channel_spectrum_PSD_data" + str(channelIndex) + ".txt", spectrumPSD )
+    np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
+    spectrumPSD = [float(sum(col))/len(col) for col in zip(*spectrogramData)]
+    spectrumPSD = np.array(spectrumPSD)/100
+    np.savetxt("outdata/channel_spectrum_PSD_data" + str(channelIndex) + ".txt", spectrumPSD )
 
-     plt.plot(spectrumPSD.transpose())
-     plt.savefig("outdata/channel_spectrum_psd_" + str(channelIndex) + ".png" )
+    plt.plot(spectrumPSD.transpose())
+    plt.savefig("outdata/channel_spectrum_psd_" + str(channelIndex) + ".png" )
 
-     plt.clf()
+    plt.clf()
 
-     plt.imshow(np.array(spectrogramData))
-     plt.savefig("outdata/channel_spectrogram_" + str(channelIndex) + ".png" )
+    plt.imshow(np.array(spectrogramData))
+    plt.savefig("outdata/channel_spectrogram_" + str(channelIndex) + ".png" )
 
-     plt.clf()
+    plt.clf()
 
-     S = imag(S12x);
+    S = imag(S12x);
 
     #WPLI
-     outsum   = nansum(S,1) # compute the sum; this is 1 x size(2:end)
-     outsumW  = nansum(abs(S),1) # normalization of the WPLI
-     outssq   = nansum(S.^2,1)
-     wpli     = (outsum.^2 - outssq)./(outsumW.^2 - outssq) # do the pairwise thing in a handy way
+     #outsum   = nansum(S,1) # compute the sum; this is 1 x size(2:end)
+     #outsumW  = nansum(abs(S),1) # normalization of the WPLI
+     #outssq   = nansum(S.^2,1)
+     #wpli     = (outsum.^2 - outssq)./(outsumW.^2 - outssq) # do the pairwise thing in a handy way
 
 
-     break
+    break
 
  except:
-     traceback.print_exc(file=sys.stdout)
- return
+   traceback.print_exc(file=sys.stdout)
+   return
 
 analyzeEDFData()
 print (" end 999 ")

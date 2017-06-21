@@ -54,11 +54,14 @@ import itertools
 import csv
 import datetime
 import os.path
+from chronux.utils import * 
 #import chronux.task_utils as tsk
 
 from bokeh.charts import Bar, output_file, show
 from bokeh.charts.attributes import cat, color
 from bokeh.charts.operations import blend
+
+from multiprocessing import Pool
 
 import math
 from math import *
@@ -89,11 +92,11 @@ def processLanding(request):
     Input: params.request
     Output: Delegates task to corresponding handler
     '''
-    chronuxHomeButton = request.POST.get("chronuxHomeButton","0" )
+    chronuxHomeButton = request.POST.get("chronuxHomeButton","1" )
 
     if chronuxHomeButton == "0":
         return submittedJobs ( request )
-    elif chronuxHomeButton == "1":
+    elif chronuxHomeButton == "1" :
         return listProjects( request )
     
 @login_required
@@ -264,9 +267,17 @@ def analysisParametersSelect(request):
    # print (fileList)            
     fileList = [x for x in fileList if x in dataFileNames] 
     
+    dataFileList = []
+    
     for fileName in dataFileNames:
-        datafile = Datafile ( filePath = datafileDirectory, fileType = edfFileType, project = project )
-        datafile.save()
+        filePath = datafileDirectory+ "/" + fileName
+        datafiles = Datafile.objects.filter(filePath = filePath)
+        if len(datafiles) == 0:
+            datafile = Datafile ( filePath = datafileDirectory+ "/" + fileName, fileType = edfFileType, project = project )
+            datafile.save()
+        else:
+            datafile = datafiles[0]
+        dataFileList.append(datafile)
         
     firstFileName = fileList[0]
     
@@ -290,72 +301,115 @@ def analysisParametersSelect(request):
         
         edfFileObjList.append(edfFileObj)
         
+    bipolarMappingFilePath = settings.PROJECT_BASE_FOLDER + "/bipolar_mapping.txt"
+    
+    bipolarMappingFile = open(bipolarMappingFilePath, "r")
+    
+    print (" bipolarMappingFilePath = " + str(bipolarMappingFilePath))
+
+    bipolarObjList = []    
+    
+    for line in bipolarMappingFile:
+        line = line.replace("\n","").replace("\t","")
+        if line == "":
+            break
+        data = line.split("-")
+        
+        bipolarObj = BipolarObj()
+        
+        bipolarObj.channel1 = data[0]
+        bipolarObj.channel2 = data[1]
+        
+        bipolarObjList.append(bipolarObj)
+    
+    print (str(bipolarObjList))
+        
     return render(request, 'chronux/analysisParametersSelect.html', {
         "project":project,
         "channelMap":channelMap,
         "edfFileObjList":edfFileObjList,
+        "dataFileList" : dataFileList,
+        "bipolarObjList": bipolarObjList,
+        "eegBandMap": EEG_BANDS,
     })
 
 @login_required
 def submitAnalysis(request):
 
     projectId = request.POST.get("projectId",0 )
+    
+    project = Project.objects.get ( pk = projectId )
+    datafiles = Datafile.objects.filter( project = project ) 
 
-    selectedSpectrogramChannels = request.POST.getlist("fileName") 
+    spectrogramChannels = request.POST.getlist("spectrogramChannel") 
     
-    edfFileType = FileType.objects.filter(name = "edfFile")[0]
-    
-    fileList = os.listdir(datafileDirectory)
-   # print (fileList)            
-    fileList = [x for x in fileList if x in datadFileNames] 
-    
-    firstFileName = fileList[0]
-    
-    layFileName = firstFileName[:firstFileName.index(".edf")] + ".lay"
-    
-    channelMap, commentsObjList = parseLayFile(datafileDirectory + "/" + layFileName )
-    
-    edfFileObjList = []    
-    
-    for fileName in fileList:
-        
-        layFileName = fileName[:fileName.index(".edf")] + ".lay"
-        
-        channelMap1, commentsObjList1 = parseLayFile(datafileDirectory + "/" + layFileName )
-        
-        edfFileObj = EDFFileObj () 
-        
-        edfFileObj.fileName = fileName
-        edfFileObj.channelMap = channelMap1
-        edfFileObj.commentsObjList = commentsObjList
-        
-        edfFileObjList.append(edfFileObj)
-        
-    samplingFrequency = request.POST.get('samplingFrequency', '') 
+    samplingFrequency = float(request.POST.get('samplingFrequency', 0)) 
     removeLineNoise = request.POST.get('removeLineNoise', False)
 
-    timeWindow = float(request.POST.get('timeWindow', '') )
-    numDataPoints = int ( math.ceil ( timeWindow * samplingFrequency ) ) 
+    timeWindow = float(request.POST.get('timeWindow', '0') )
 
     bandWidth = float ( request.POST.get('bandWidth', '') )
 
-    stepSize = float ( request.POST.get('stepSize', '') )
-    padding = float ( request.POST.get('padding', '') )
-    timeBandWidth = timeWindow * bandWidth
-    numTapers = 2 * timeBandWidth - 1
-        
-    detrendOrFilter =  request.POST.get('detrend', '') 
+    stepSize = float ( request.POST.get('stepSize', '0') )
+    padding = float ( request.POST.get('padding', '0') )
+    
+    upperFrequency = int ( request.POST.get('upperFrequency', '0') )
+    lowerFrequency = int ( request.POST.get('lowerFrequency', '0') )
+    
+    numTapers = int ( request.POST.get('numTapers', '0') )    
+    
+    coherogramChannel = request.POST.getlist('coherogramChannel')
 
-    reReference =  request.POST.get('subtractFromRefChannel', '') 
- 
-    sourceLocalization =  request.POST.get('sourceLocalization', False) 
-    computeSpectralDerivatives =  request.POST.get('computeSpectralDerivatives', False) 
+    coherogramChanneName1 = request.POST.getlist('coherogramChanneName1')
+    coherogramChanneName2 = request.POST.getlist('coherogramChanneName2')
+    
+    analysisObj = AnalysisObj()
         
-    return render(request, 'chronux/analysisParametersSelect.html', {
-        "datadFileNames":datadFileNames,
+    analysisObj.datafiles = datafiles
+    analysisObj.spectrogramChannels = spectrogramChannels
+    
+    analysisObj.samplingFrequency = samplingFrequency
+    analysisObj.removeLineNoise = removeLineNoise
+
+    analysisObj.timeWindow = timeWindow
+
+    analysisObj.bandWidth = bandWidth
+
+    analysisObj.stepSize = stepSize
+    analysisObj.padding = padding
+    
+    analysisObj.upperFrequency = upperFrequency 
+    analysisObj.lowerFrequency = lowerFrequency
+
+    print ( " analysisObj.datafiles = " + str(datafiles))
+    print ( " analysisObj.spectrogramChannels = " + str(analysisObj.spectrogramChannels))
+    print ( " analysisObj.samplingFrequency = " + str(analysisObj.samplingFrequency))
+    print ( " analysisObj.removeLineNoise = " + str(analysisObj.removeLineNoise))
+    print ( " analysisObj.timeWindow = " + str(analysisObj.timeWindow))
+    print ( " analysisObj.numDataPoints = " + str(analysisObj.numDataPoints))
+    print ( " analysisObj.bandWidth = " + str(analysisObj.bandWidth))
+    print ( " analysisObj.stepSize = " + str(analysisObj.stepSize))
+    print ( " analysisObj.padding = " + str(analysisObj.padding))
+    print ( " analysisObj.upperFrequency = " + str(analysisObj.upperFrequency))
+
+    numDataPoints = int ( math.ceil ( timeWindow * samplingFrequency ) )     
+    
+    analysisObj.numDataPoints = numDataPoints    
+    
+    timeBandWidth = timeWindow * bandWidth
+    numTapersCalculated = 2 * timeBandWidth - 1
+    
+    if numTapers == 0:
+        
+        numTapersCalculated = numTapers    
+        
+    analysisObj.numTapers = numTapers
+    
+    analysisResultsObj = analyzeEDFData(analysisObj)
+    
+    #ts.analyzeEDFData.delay(analysisObj)   
+    return render(request, 'chronux/analysisResults.html', {
         "project":project,
-        "channelMap":channelMap,
-        "edfFileObjList":edfFileObjList,
     })
 
 def parseLayFile(layFileName):
@@ -413,7 +467,7 @@ def parseLayFile(layFileName):
                  
             if patientDataFound:
                 data = line.split("=")
-                patientMap[data[0]] = data[1]
+                #patientMap[data[0]] = data[1]
                      
             #if commentsFound:
                 #print ( str(line) ) 
@@ -437,7 +491,7 @@ def parseLayFile(layFileName):
                 data = line.split(",")
                 print ( str(data))
                 
-                if line.find("loss") == -1 and line.find("re-entered") == -1:
+                if line.find("loss") == -1:
                 
                     commentsObj = CommentsObj()
                     commentsObj.commentNum = commentNum

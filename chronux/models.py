@@ -58,7 +58,7 @@ class Datafile(models.Model):
     fileType = models.ForeignKey(FileType, blank = True, null = True )
     project = models.ForeignKey ( Project ) 
     def __str__(self):
-        return self.name
+        return self.filePath
 
 class Epoch(models.Model):
     epochValue1 = models.FloatField()

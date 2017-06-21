@@ -19,3 +19,12 @@ DEFAULT_MAX_LIST_DISPLAY = 500
 
 DEFAULT_STARTING_COLUMN = 6
 
+EEG_BANDS = {}
+
+EEG_BANDS["Delta"] = "0-4"
+EEG_BANDS["Theta"] = "4-7"
+EEG_BANDS["Alpha"] = "8-12"
+EEG_BANDS["Beta"] = "12-30"
+EEG_BANDS["Gamma"] = "30-100"
+
+

@@ -62,6 +62,7 @@ from bokeh.charts.attributes import cat, color
 from bokeh.charts.operations import blend
 
 from multiprocessing import Pool
+from multitaper import *
 
 import math
 from math import *

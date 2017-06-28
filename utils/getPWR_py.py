@@ -42,15 +42,16 @@ def getWaveletsNorm( bands, wFactor, eegFS ):
         #print ( " S2 = " + str(S2[-3:]))
         
         A = (sigmaT * math.sqrt(pi))  ** -0.5  #normalization for total power = 1
-        psi = A * np.array([abs((x*y).real) for x,y in zip ( S1,S2) ])
-        #psi =  [x*y for x,y in zip ( S1,S2) ]
+        psi = A * np.array([x*y for x,y in zip ( S1,S2) ])
 
+        #psi =  [x*y for x,y in zip ( S1,S2) ]
         #print (A)
-        
-        #print ( psi)
-        
+        #print ( psi[:10] )
+        #print ( np.shape(psi))
         #psi = real(psi); %to make output real
-        s = sum(psi)/2 #divide by total energy so convolution results in one
+
+        s = sum([abs(x.real) for x in psi])/2 #divide by total energy so convolution results in one
+
         #print ( s)        
         psi = psi / s
         #print ( psi[:10])
@@ -64,11 +65,60 @@ def getWaveletsNorm( bands, wFactor, eegFS ):
 def getPWR():
     try:
         eegData = loadmat('EEG181.mat')
+        
+        eegData = eegData["eegData"]
+        
         eegFS = 250
         wFactor = 8
         bands = np.arange( 2,61)
         #print (bands)
         wavelets = getWaveletsNorm( bands, wFactor, eegFS )
+        #print ( (eegData) ) 
+        eeg = eegData[14]        
+        eeg = eeg[50*eegFS - 1 : 80*eegFS - 1 ]   
+        
+        #print ( eeg[:10])
+        
+        pwrs = [] 
+
+        # filter
+        for filtI, psi in wavelets.items():
+
+            #convolution of wavelet and signal
+            
+            print (" psi = " + str( psi[:10] ) )            
+
+            c = np.convolve (eeg,psi)
+            
+            print (len(c))
+
+            print (c[:10])
+            
+            #break
+
+            #fix start and end
+            N = round((len(psi)-1)/2)
+
+            print ( "n = " + str(N))
+            c = c[N-1:len(c)-N-1]
+            print ( " c = " + str(c[:10]))
+
+            if len(c) > len(eeg):
+                c = c[:len(eeg)]
+
+            power = (abs(c))**2
+
+            print ( " power = " + str(power[:10]) )
+            #pwrs[filtI] = np.mean(power)
+            
+            print ( " mean power = " + str(np.mean ( power ) ) ) 
+                    
+            pwrs.append(np.mean(power))
+
+            #break
+        plt.plot(bands,pwrs)
+        plt.show()
+                
     except:
         traceback.print_exc(file=sys.stdout)
     return

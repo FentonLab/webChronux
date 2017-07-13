@@ -5,6 +5,7 @@ import traceback
 from scipy.io import loadmat
 import math
 from scipy.signal import kaiser, group_delay, hilbert, kaiserord, firwin, lfilter
+from numpy import angle
 import matplotlib.pyplot as plt
 
 def getPAC():
@@ -37,8 +38,8 @@ def getPAC():
         # edges for phase
         edges = np.linspace(-math.pi,math.pi,21)
         
-        print ( " eeg = " + str(eeg[:10]))
-        print ( " edges = " + str(len(edges)))
+        #print ( " eeg = " + str(eeg[:10]))
+        #print ( " edges = " + str(len(edges)))
         
         #eegFS = 2000 #sampling rate
         
@@ -75,7 +76,7 @@ def getPAC():
         # Compute the order and Kaiser parameter for the FIR filter.
         N, beta = kaiserord(ripple_db, width)
         
-        #print ('N = ',N, 'beta = kaiser param = ', beta)
+        print ('N = ',N, 'beta = kaiser param = ', beta)
         
         # The cutoff frequency of the filter.
         cutoff_hz = 9.0
@@ -88,8 +89,12 @@ def getPAC():
         # by multiplying tap coefficients by -1 and
         # add 1 to the centre tap ( must be even order filter)
         
+        midPoint = math.floor(N/2)
+        
+        print ( " midPoint = " + str(midPoint))
+        
         hpftaps = [-1*a for a in hpftaps]
-        hpftaps[33] = hpftaps[33] + 1
+        hpftaps[midPoint] = hpftaps[midPoint] + 1
         
         #----------------------------------------------------------
         # Now calculate the tap weights for a lowpass filter at say 15hz
@@ -98,7 +103,7 @@ def getPAC():
         lpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))
         
         # Subtract 1 from lpf centre tap for gain adjust for hpf + lpf
-        lpftaps[33] = lpftaps[33] - 1
+        lpftaps[midPoint] = lpftaps[midPoint] - 1
         
         #----------------------------------------------------------
         # Now add the lpf and hpf coefficients to form the bpf.
@@ -108,11 +113,24 @@ def getPAC():
         print ( " num taps = " + str(len(taps)))
         print ( " taps [:10] = " + str(taps[:10]))
         
-        #----------------------------------------------------------
-        # Use lfilter to filter test signal with Bandpass filter.
+        ##----------------------------------------------------------
+        ## Use lfilter to filter test signal with Bandpass filter.
         filtered_x = lfilter(taps, 1.0, eeg)   
-        print ( " filtered_x = " + str(filtered_x[:10]))        
-        ####################################
+        print ( " filtered_x = " + str(filtered_x[:10]))   
+        
+        #print ( " num = " + str(len(taps)) + " denom = " + str([1]*len(taps) ) ) 
+        
+        denom = [0]*len(taps)
+        denom[0] = 1
+        
+        [a,f] = group_delay( [ taps , denom ] , int(nyq))  
+        
+        print ( " a = " + str(len(a)) + " f = " + str(f) ) 
+        
+        #k = [1 if x >= lcut and x <= hcut else 0 for x in f]
+        
+        #print ( k) 
+        #####################################
         
         #h = fdesign.bandpass('fst1,fp1,fp2,fst2,ast1,ap,ast2', Fstop1, Fpass1,Fpass2, Fstop2, Astop1, Apass, Astop2)
      
@@ -120,7 +138,7 @@ def getPAC():
         
         #bAlpha = Hd.Numerator
         ##group delay
-        #[a,f] = group_delay(bAlpha,1,nyq,eegFS)
+
         
         #k = f >= lcut & f <= hcut
         

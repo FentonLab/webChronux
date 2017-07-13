@@ -15,6 +15,55 @@ from scipy.signal import kaiserord, lfilter, firwin, freqz
 #from pylab import figure, clf, plot, xlabel, ylabel, xlim, ylim, title, grid, axes, show
 from math import sqrt, log10
 
+def getMI(amp, phase, edges):
+
+    '''
+    compute modulation index as shown in Tort 2010
+    Original Matlab code by Dino Dvorak 2012 dino@indus3.net
+    Python version by Siddhartha Mitra 2017 mitra.siddhartha@gmail.com
+    Input: 
+         - amp: Amplitude
+         - phase: Phase
+         - edges: Edges
+    Output: 
+         - MI
+    '''
+
+    try:
+        
+        # get histogram for phases
+        h = np.zeros(len(edges)-1)
+        
+        for hi in range ( len(edges) - 1 ):
+            
+            k = phase >= edges[hi] & phase < edges[hi+1]
+            
+            if sum(k) > 0: # only if there are some values, otherwise keep zero
+                h[hi] = np.mean(amp[k]) # mean of amplitudes at that phase bin
+    
+        # fix last value
+        k = [x == y for x,y in zip ( phase, edges [end])] 
+        if not all([x == 0 for x in k]):
+            h[end] = h[end] + np.mean(amp[k])
+        
+        # convert to probability
+        h = h / sum(h)
+        
+        # replace zeros by eps
+        k = h == 0
+        h[k] = eps
+        
+        # calculate modulation index
+        Hp = -1 * sum( [x*np.log(x) for x in h]) # entropy of the histogram
+        D = np.log(len(h)) - Hp
+        MI = D / np.log(len(h))
+    
+    
+    except:
+        traceback.print_exc(file=sys.stdout)    
+        
+    return MI
+
 def test():
         
     '''
@@ -42,6 +91,10 @@ def test():
         
         eeg = eeg - np.mean(eeg, axis = 0)         
         
+        # edges for phase
+        edges = np.linspace(-math.pi,math.pi,21) 
+        
+        #edges = np.array(list(edges).append(math.pi))
         
         lcut = 9.0 
         hcut = 13.0
@@ -61,7 +114,7 @@ def test():
         # Compute the order and Kaiser parameter for the FIR filter.
         N, beta = kaiserord(ripple_db, width)
         
-        print ('N = ',N, 'beta = kaiser param = ', beta)
+        #print ('N = ',N, 'beta = kaiser param = ', beta)
         
         # The cutoff frequency of the filter.
         cutoff_hz = lcut
@@ -69,7 +122,7 @@ def test():
         # Use firwin with a Kaiser window to create a lowpass FIR filter.
         hpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))    
         
-        print (hpftaps[:10])
+        #print (hpftaps[:10])
         
         #----------------------------------------------------------
         # now create the taps for a high pass filter.
@@ -100,26 +153,26 @@ def test():
         
         [a,f] = group_delay( [ taps , denom ] , int(nyq))  
         
-        print ( " num taps = " + str(len(taps)))
-        print ( " taps [:10] = " + str(taps[:10]))        
+        #print ( " num taps = " + str(len(taps)))
+        #print ( " taps [:10] = " + str(taps[:10]))        
         
         #print ( " a = " + str(a) ) 
         #print ( " f = " + str(len(f)) ) 
         
-        bAlpha = a           
+        bAlpha = taps           
         
         bAlphax = np.array(a) * sample_rate/(2*math.pi)
-        print ( " bAlpha = " + str(bAlphax) )         
+        #print ( " bAlpha **** = " + str(bAlpha) )         
         
         k = [f[i] for i,m in enumerate(bAlphax) if m >= 9 and m <= 13]
         #print ( " k = " + str(k) ) 
         
         gdAlpha = math.floor(np.mean(k))
-        print ( "gdAlpha = " + str(gdAlpha ) )
+        #print ( "gdAlpha = " + str(gdAlpha ) )
         
         fGamma = np.arange(20,101,5)
         
-        print ( " fGamma = " + str(fGamma) )
+        #print ( " fGamma = " + str(fGamma) )
 
         bw = 20 #bandwidth
         attendB = ripple_db #attenuation
@@ -172,29 +225,37 @@ def test():
             filtersGamma[fI].append (taps)
             filtersGamma[fI].append (val)
 
-        MIs = []
+        MIs = {}
         
         # phase (alpha)
-        ph = lfilter(bAlpha,1,eeg)
-        print ( " ph = " + str(ph[:10] ) ) 
-        ph = np.append(ph[gdAlpha+1:], np.zeros(gdAlpha))
-        ph1 = np.angle(hilbert(ph))
         
-        print ( " ph1 = " + str(ph1[:10] ) ) 
+        #print ( " bAlpha = " + str(bAlpha[:20] ) ) 
+        #print ( " eeg = " + str(eeg[:20] ) ) 
+
+        ph = lfilter(bAlpha,1,eeg)
+        
+        #print ( " ph before angle = " + str(ph[:10] ) ) 
+        
+        ph = np.append(ph[gdAlpha+1:], np.zeros(gdAlpha))
+        ph = np.angle(hilbert(ph))
+        
+        #print ( " ph after angle = " + str(ph[:10] ) ) 
         
         ##amplitude for gamma range + MI
-        #for fI in range(len(fGamma)): 
+        for key, value in filtersGamma.items(): 
             
-            #b = filtersGamma[fI][0]
-            #gd = filtersGamma[fI][1]
+            #amplitude
+            amp = lfilter(value[0],1,eeg)
+            gd = value[1]
             
-            ##amplitude
-            #amp = lfilter(b,1,eeg)
-            
-            #amp = [ amp [gd+1:end] , np.zeros(gd)]
-            #amp = abs(hilbert(amp))
+            amp = np.append(amp[gd+1:], np.zeros(gd))
+            amp = abs(hilbert(amp))
             
             #compute raw modulation index
+            print (" amp = " + str(amp[:20]) ) 
+            print (" ph = " + str(ph[:20]) ) 
+            print (" edges = " + str(edges) ) 
+            
             #MI = getMI(amp,ph,edges)
         
             #MIs[fI] = MI

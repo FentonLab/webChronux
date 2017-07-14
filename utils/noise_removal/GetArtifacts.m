@@ -30,7 +30,7 @@ winLenVarSlide = 0.05*eegFS; %sliding variance window
 
 %high frequency
 lenHF = 50; %length of HF filter [samples]
-freqHF = 250; %frequency of HF filter [Hz]
+freqHF = 100; %frequency of HF filter [Hz]
 winLenVarHF = 0.1*eegFS; %variance window [samples]
 winLenSmoothHF = 0.2*eegFS; %smoothing window after HF [samples]
 thHF = 1e-5; %threshold for HF signal - INCREASE for LOWER sensitivity
@@ -81,13 +81,13 @@ end
 %merge all three signals
 k = ones(1,length(eeg));
 if doSaturation == 1; k = k & sigSat; end;
-if doSmallSig == 1; k = k & sigSmall; end;
+%if doSmallSig == 1; k = k & sigSmall; end;
 if doHF == 1; k = k & sigHF; end;
 
 %compute windows
 [sigOKCH, winOKCH] = GetWindows(k,minLen,winSafe);
 
-%{
+
 figure
 subplot(5,1,1);
 plot(eeg,'k');
@@ -99,10 +99,10 @@ plot(sigSat,'r');
 title('saturations');
 axis tight;
 
-subplot(5,1,3);
-plot(sigSmall,'r');
-title('small signal');
-axis tight;
+% subplot(5,1,3);
+% plot(sigSmall,'r');
+% title('small signal');
+% axis tight;
 
 subplot(5,1,4);
 plot(sigHF,'r');
@@ -114,7 +114,6 @@ plot(k,'k*');
 plot(sigOKCH,'r');
 title('good signal');
 axis tight;
-%}
 
 %store data
 %signalOK{chI} = sigOKCH;
@@ -127,4 +126,4 @@ axis tight;
 %     
 % end %files
 
-delete(myPool);
+%delete(myPool);

@@ -25,7 +25,8 @@ k = [k(1) k];
 %skip extremely short saturations (1 value is 0), find 010
 k(1) = 0;
 k(end) = 0;
-kUP = find(k(1:end-1) == 0 & k(2:end) == 1); kUP = kUP + 1;
+kUP = find(k(1:end-1) == 0 & k(2:end) == 1); 
+kUP = kUP + 1;
 kDOWN = find(k(1:end-1) == 1 & k(2:end) == 0);
 d = kDOWN-kUP;
 kd = find(d < 2); %allow two samples being same
@@ -62,8 +63,10 @@ end
 %overshoots allowed
 if maxLengthCrossing ~= 0                
     %first find overshoots and allow short ones
-    k(1) = 1; k(end) = 1;
-    kDOWN = find(k(1:end-1) == 1 & k(2:end) == 0); kDOWN = kDOWN + 1;
+    k(1) = 1; 
+    k(end) = 1;
+    kDOWN = find(k(1:end-1) == 1 & k(2:end) == 0);
+    kDOWN = kDOWN + 1;
     kUP = find(k(1:end-1) == 0 & k(2:end) == 1); 
     d = kUP - kDOWN + 1; %length of overshoots
     kd = d > maxLengthCrossing; %only select large crossings

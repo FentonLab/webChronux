@@ -29,35 +29,50 @@ def getMI(amp, phase, edges):
          - MI
     '''
 
+    MI = ''
+
     try:
         
         # get histogram for phases
-        h = np.zeros(len(edges)-1)
+        h = []
         
         for hi in range ( len(edges) - 1 ):
             
-            k = phase >= edges[hi] & phase < edges[hi+1]
+            k = [ 1 if x >= edges[hi] and x < edges[hi+1] else 0 for x in phase]
+            #print ( " k = " + str(k) ) 
             
             if sum(k) > 0: # only if there are some values, otherwise keep zero
-                h[hi] = np.mean(amp[k]) # mean of amplitudes at that phase bin
+                print (sum([x for i,x in enumerate(amp) if k[i] == 1 ]))
+                
+                h.append( np.mean([x for i,x in enumerate(amp) if k[i] == 1 ])) # mean of amplitudes at that phase bin
+            else:
+                h.append(0)
+                
+        #print ( " h = " + str(h) )
     
-        # fix last value
-        k = [x == y for x,y in zip ( phase, edges [end])] 
-        if not all([x == 0 for x in k]):
-            h[end] = h[end] + np.mean(amp[k])
+        ## fix last value
+        #k = [x == y for x,y in zip ( phase, edges [end])] 
+        #if not all([x == 0 for x in k]):
+            #h[end] = h[end] + np.mean(amp[k])
         
-        # convert to probability
+        ## convert to probability
         h = h / sum(h)
+                
+        #print ( " h = " + str(h) )
         
-        # replace zeros by eps
-        k = h == 0
-        h[k] = eps
+        ## replace zeros by eps
+        #k = h == 0
+        #h[k] = eps
         
-        # calculate modulation index
+        ## calculate modulation index
         Hp = -1 * sum( [x*np.log(x) for x in h]) # entropy of the histogram
+        #print ( " Hp = " + str(Hp) )
+
         D = np.log(len(h)) - Hp
+        #print ( " D = " + str(D) )
+ 
         MI = D / np.log(len(h))
-    
+        #print ( " MI = " + str(MI) )
     
     except:
         traceback.print_exc(file=sys.stdout)    
@@ -83,13 +98,21 @@ def test():
         
         eegData = eegData["eegData"]
                 
-        eeg = eegData[14]
+        eeg1 = eegData[14]
         
-        print ( eeg[:5])
+        print ( eeg1[:5])
         
-        eeg = eeg[50 * eegFS - 1 : 80 * eegFS - 1 ]   
+        eeg1 = eeg1[50 * eegFS - 1 : 80 * eegFS - 1 ]   
         
-        eeg = eeg - np.mean(eeg, axis = 0)         
+        eeg1 = eeg1 - np.mean(eeg1, axis = 0)         
+
+        eeg2 = eegData[15]
+        
+        print ( eeg2[:5])
+        
+        eeg2 = eeg2[50 * eegFS - 1 : 80 * eegFS - 1 ]   
+        
+        eeg2 = eeg2 - np.mean(eeg2, axis = 0)         
         
         # edges for phase
         edges = np.linspace(-math.pi,math.pi,21) 
@@ -225,19 +248,19 @@ def test():
             filtersGamma[fI].append (taps)
             filtersGamma[fI].append (val)
 
-        MIs = {}
+        PLVs = []
         
         # phase (alpha)
         
         #print ( " bAlpha = " + str(bAlpha[:20] ) ) 
         #print ( " eeg = " + str(eeg[:20] ) ) 
 
-        ph = lfilter(bAlpha,1,eeg)
+        #ph = lfilter(bAlpha,1,eeg)
         
-        #print ( " ph before angle = " + str(ph[:10] ) ) 
+        ##print ( " ph before angle = " + str(ph[:10] ) ) 
         
-        ph = np.append(ph[gdAlpha+1:], np.zeros(gdAlpha))
-        ph = np.angle(hilbert(ph))
+        #ph = np.append(ph[gdAlpha+1:], np.zeros(gdAlpha))
+        #ph = np.angle(hilbert(ph))
         
         #print ( " ph after angle = " + str(ph[:10] ) ) 
         
@@ -245,22 +268,29 @@ def test():
         for key, value in filtersGamma.items(): 
             
             #amplitude
-            amp = lfilter(value[0],1,eeg)
+            amp1 = lfilter(value[0],1,eeg1)
+            amp2 = lfilter(value[0],1,eeg2)
             gd = value[1]
             
-            amp = np.append(amp[gd+1:], np.zeros(gd))
-            amp = abs(hilbert(amp))
+            amp1 = np.append(amp1[gd+1:], np.zeros(gd))
+            amp2 = np.append(amp2[gd+1:], np.zeros(gd))
+
+            ph1 = np.angle(hilbert(amp1))
+            ph2 = np.angle(hilbert(amp2))
             
+            phd = ph1 - ph2
             #compute raw modulation index
-            print (" amp = " + str(amp[:20]) ) 
-            print (" ph = " + str(ph[:20]) ) 
-            print (" edges = " + str(edges) ) 
+            #print (" amp = " + str(amp[:20]) ) 
+            #print (" ph = " + str(ph[:20]) ) 
+            #print (" edges = " + str(edges) ) 
             
-            #MI = getMI(amp,ph,edges)
+            PLVs.append((1/len(phd))*(abs(sum(np.exp(1j*phd))))) 
+
+            #break
         
-            #MIs[fI] = MI
-        
-        #plt.plot(fGamma,MIs)
+        print ( " MIs = " + str(PLVs))
+        plt.plot(fGamma,PLVs)
+        plt.show()
 
         #print ( [str(k) + ":" + str(v[1]) + "-" + str(v[0][:5]) for k,v in filtersGamma.items() ]  )
         

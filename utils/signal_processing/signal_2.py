@@ -1,150 +1,289 @@
+import numpy as np
+import os
+import sys
+import traceback
+from scipy.io import loadmat
+import math
+import scipy.signal as signal
+from scipy.signal import *
+#from scipy.signal import mfreqz, impz, kaiser, group_delay, hilbert
+import matplotlib.pyplot as plt
+
 from numpy import cos, sin, pi, absolute, arange
 from numpy.random import normal
 from scipy.signal import kaiserord, lfilter, firwin, freqz
-from scipy.signal import kaiser, group_delay, hilbert, angle
-from pylab import figure, clf, plot, xlabel, ylabel, xlim, ylim, title, grid, axes, show
+#from pylab import figure, clf, plot, xlabel, ylabel, xlim, ylim, title, grid, axes, show
 from math import sqrt, log10
 
-#----------------------------------------------------------
-# Set the sampling frequency to 100. Sample period is 0.01. 
-# A frequency of 1 will have 100 samples per cycle, and 
-# therefore have 4 cycles in the 400 samples.
+def getMI(amp, phase, edges):
 
+    '''
+    compute modulation index as shown in Tort 2010
+    Original Matlab code by Dino Dvorak 2012 dino@indus3.net
+    Python version by Siddhartha Mitra 2017 mitra.siddhartha@gmail.com
+    Input: 
+         - amp: Amplitude
+         - phase: Phase
+         - edges: Edges
+    Output: 
+         - MI
+    '''
 
-sample_rate = 100.0
-nyq_rate = sample_rate / 2.0
-nsamples = 400
-t = arange(nsamples) / sample_rate
+    MI = ''
 
-# t = 0.01,0.02.......4.0 (400 samples)
+    try:
+        
+        # get histogram for phases
+        h = []
+        
+        for hi in range ( len(edges) - 1 ):
+            
+            k = [ 1 if x >= edges[hi] and x < edges[hi+1] else 0 for x in phase]
+            #print ( " k = " + str(k) ) 
+            
+            if sum(k) > 0: # only if there are some values, otherwise keep zero
+                print (sum([x for i,x in enumerate(amp) if k[i] == 1 ]))
+                
+                h.append( np.mean([x for i,x in enumerate(amp) if k[i] == 1 ])) # mean of amplitudes at that phase bin
+            else:
+                h.append(0)
+                
+        #print ( " h = " + str(h) )
+    
+        ## fix last value
+        #k = [x == y for x,y in zip ( phase, edges [end])] 
+        #if not all([x == 0 for x in k]):
+            #h[end] = h[end] + np.mean(amp[k])
+        
+        ## convert to probability
+        h = h / sum(h)
+                
+        #print ( " h = " + str(h) )
+        
+        ## replace zeros by eps
+        #k = h == 0
+        #h[k] = eps
+        
+        ## calculate modulation index
+        Hp = -1 * sum( [x*np.log(x) for x in h]) # entropy of the histogram
+        #print ( " Hp = " + str(Hp) )
 
-#----------------------------------------------------------
-# Create a test signal at pass band centre plus gaussian 
-# noise. Check sigma = rms of generated samples
+        D = np.log(len(h)) - Hp
+        #print ( " D = " + str(D) )
+ 
+        MI = D / np.log(len(h))
+        #print ( " MI = " + str(MI) )
+    
+    except:
+        traceback.print_exc(file=sys.stdout)    
+        
+    return MI
 
+def test():
+        
+    '''
+    compute phase amplitude coupling, as in Vinnick
+    PAC plotted at the end
+    Original Matlab code by Dino Dvorak 2012 dino@indus3.net
+    Python version by Siddhartha Mitra 2017 mitra.siddhartha@gmail.com
+    Input: 
+    Output: 
+    '''
 
-peak = 0.3
-x = peak*sin(2*pi*12.5*t)
+    try:
+        
+        eegData = loadmat('../EEG181.mat')
+        
+        eegFS = 250 # sampling frequency
+        
+        eegData = eegData["eegData"]
+                
+        eeg = eegData[14]
+        
+        print ( eeg[:5])
+        
+        eeg = eeg[50 * eegFS - 1 : 80 * eegFS - 1 ]   
+        
+        eeg = eeg - np.mean(eeg, axis = 0)         
+        
+        # edges for phase
+        edges = np.linspace(-math.pi,math.pi,21) 
+        
+        #edges = np.array(list(edges).append(math.pi))
+        
+        lcut = 9.0 
+        hcut = 13.0
+        
+        #----------------------------------------------------------
+        # Set the sampling frequency to 100. Sample period is 0.01. 
+        # A frequency of 1 will have 100 samples per cycle, and 
+        # therefore have 4 cycles in the 400 samples.
+        
+        sample_rate = 250.0
+        nyq = sample_rate / 2.0
+        width = 2.0/nyq # pass to stop transition width
+        
+        # The desired attenuation in the stop band, in dB.
+        ripple_db = 40.0
+        
+        # Compute the order and Kaiser parameter for the FIR filter.
+        N, beta = kaiserord(ripple_db, width)
+        
+        #print ('N = ',N, 'beta = kaiser param = ', beta)
+        
+        # The cutoff frequency of the filter.
+        cutoff_hz = lcut
+        
+        # Use firwin with a Kaiser window to create a lowpass FIR filter.
+        hpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))    
+        
+        #print (hpftaps[:10])
+        
+        #----------------------------------------------------------
+        # now create the taps for a high pass filter.
+        # by multiplying tap coefficients by -1 and
+        # add 1 to the centre tap ( must be even order filter)
+        
+        hpftaps = [-1*a for a in hpftaps]
+        print ( len(hpftaps))
+        midPoint = int(np.round(len(hpftaps)/2))
+        if midPoint % 2 != 0:
+            midPoint = midPoint -1
+        hpftaps[midPoint] = hpftaps[midPoint] + 1
+        
+        #----------------------------------------------------------
+        # Now calculate the tap weights for a lowpass filter at say 15hz
+        
+        cutoff_hz = hcut
+        lpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))
+        
+        # Subtract 1 from lpf centre tap for gain adjust for hpf + lpf
+        lpftaps[midPoint] = lpftaps[midPoint] - 1
+        
+        taps = [sum(pair) for pair in zip(hpftaps, lpftaps)]
 
-mu, sigma = 0, 0.1 # mean and standard deviation
-noise = normal(mu, sigma, 400)
+        denom = [0]*len(taps)
+        denom[0] = 1
+        #denom[-1] = 1
+        
+        [a,f] = group_delay( [ taps , denom ] , int(nyq))  
+        
+        #print ( " num taps = " + str(len(taps)))
+        #print ( " taps [:10] = " + str(taps[:10]))        
+        
+        #print ( " a = " + str(a) ) 
+        #print ( " f = " + str(len(f)) ) 
+        
+        bAlpha = taps           
+        
+        bAlphax = np.array(a) * sample_rate/(2*math.pi)
+        #print ( " bAlpha **** = " + str(bAlpha) )         
+        
+        k = [f[i] for i,m in enumerate(bAlphax) if m >= 9 and m <= 13]
+        #print ( " k = " + str(k) ) 
+        
+        gdAlpha = math.floor(np.mean(k))
+        #print ( "gdAlpha = " + str(gdAlpha ) )
+        
+        fGamma = np.arange(20,101,5)
+        
+        #print ( " fGamma = " + str(fGamma) )
 
-squares = map(lambda x: x*x, noise) 
-# squares is list of the noise samples squared
+        bw = 20 #bandwidth
+        attendB = ripple_db #attenuation
+        attenHz = 4 #transition band
+        
+        filtersGamma = {}
 
-total = sqrt(sum(squares)/400)
-snr = 10*log10(0.707*peak/total)
-#print 'rms noise = ', total
-#print 'signal to noise ratio', snr,' dB'
+        for fI in range ( len(fGamma) ): 
+        
+            lcut = fGamma[fI]-bw/2
+            hcut = fGamma[fI]+bw/2
+            
+            Fstop1 = (lcut - attenHz)  / nyq  
+            Fpass1 = lcut  / nyq 
+            Fpass2 = hcut / nyq
+            
+            Fstop2 = (hcut + attenHz) / nyq
+            Astop1 = attendB
+            Apass  = 1
+            Astop2 = attendB
+            
+            #################
+            hpftaps = firwin(N, lcut/nyq, window=('kaiser', beta))    
+            hpftaps = [-1*a for a in hpftaps]
 
-x = [sum(pair) for pair in zip(x, noise)]
+            midPoint = int(np.round(len(hpftaps)/2))
+            if midPoint % 2 != 0:
+                midPoint = midPoint -1
 
-#------------------------------------------------
-# First create a 10 (Hz) lowpass FIR filter 
-#------------------------------------------------
+            hpftaps[midPoint] = hpftaps[midPoint] + 1
 
-width = 5.0/nyq_rate # pass to stop transition width
+            lpftaps = firwin(N, hcut/nyq, window=('kaiser', beta))
+            lpftaps[midPoint] = lpftaps[midPoint] - 1
+            
+            taps = [sum(pair) for pair in zip(hpftaps, lpftaps)]
+    
+            denom = [0]*len(taps)
+            denom[0] = 1
+            
+            [a,f] = group_delay( [ taps , denom ] , int(nyq))  
 
-# The desired attenuation in the stop band, in dB.
-ripple_db = 55.0
+            x = np.array(a) * sample_rate/(2*math.pi)
 
-# Compute the order and Kaiser parameter for the FIR filter.
-N, beta = kaiserord(ripple_db, width)
+            k = [f[i] for i,m in enumerate(x) if m >= 9 and m <= 13]
+            val = math.floor(np.mean(k))
+            #################
 
-print( 'N = ',N, 'beta = kaiser param = ', beta)
+            filtersGamma[fI] = []
+            
+            filtersGamma[fI].append (taps)
+            filtersGamma[fI].append (val)
 
-# The cutoff frequency of the filter.
-cutoff_hz = 10.0
+        MIs = []
+        
+        # phase (alpha)
+        
+        #print ( " bAlpha = " + str(bAlpha[:20] ) ) 
+        #print ( " eeg = " + str(eeg[:20] ) ) 
 
-# Use firwin with a Kaiser window to create a lowpass FIR filter.
-hpftaps = firwin(N, cutoff_hz/nyq_rate, window=('kaiser', beta))
+        ph = lfilter(bAlpha,1,eeg)
+        
+        #print ( " ph before angle = " + str(ph[:10] ) ) 
+        
+        ph = np.append(ph[gdAlpha+1:], np.zeros(gdAlpha))
+        ph = np.angle(hilbert(ph))
+        
+        #print ( " ph after angle = " + str(ph[:10] ) ) 
+        
+        ##amplitude for gamma range + MI
+        for key, value in filtersGamma.items(): 
+            
+            #amplitude
+            amp = lfilter(value[0],1,eeg)
+            gd = value[1]
+            
+            amp = np.append(amp[gd+1:], np.zeros(gd))
+            amp = abs(hilbert(amp))
+            
+            #compute raw modulation index
+            #print (" amp = " + str(amp[:20]) ) 
+            #print (" ph = " + str(ph[:20]) ) 
+            #print (" edges = " + str(edges) ) 
+            
+            MI = getMI(amp,ph,edges)
+            MIs.append(MI)
+            #break
+        
+        print ( " MIs = " + str(MIs))
+        plt.plot(fGamma,MIs)
+        plt.show()
 
-#----------------------------------------------------------
-# now create the taps for a high pass filter.
-# by multiplying tap coefficients by -1 and
-# add 1 to the centre tap ( must be even order filter)
+        #print ( [str(k) + ":" + str(v[1]) + "-" + str(v[0][:5]) for k,v in filtersGamma.items() ]  )
+        
+    except:
+        traceback.print_exc(file=sys.stdout)    
+        
+    return    
 
-hpftaps = [-1*a for a in hpftaps]
-print ( len(hpftaps))
-hpftaps[33] = hpftaps[33] + 1
-
-#----------------------------------------------------------
-# Now calculate the tap weights for a lowpass filter at say 15hz
-
-cutoff_hz = 15.0
-lpftaps = firwin(N, cutoff_hz/nyq_rate, window=('kaiser', beta))
-
-# Subtract 1 from lpf centre tap for gain adjust for hpf + lpf
-lpftaps[33] = lpftaps[33] - 1
-
-#----------------------------------------------------------
-# Now add the lpf and hpf coefficients to form the bpf.
-
-taps = [sum(pair) for pair in zip(hpftaps, lpftaps)]
-
-#----------------------------------------------------------
-# Use lfilter to filter test signal with Bandpass filter.
-filtered_x = lfilter(taps, 1.0, x)
-
-#----------------------------------------------------------
-# Plot the Bandpass filter coefficients.
-
-figure(1)
-plot(taps, 'bo-', linewidth=2)
-title('FIR Bandpass Filter Coefficients (%d taps)' % N)
-grid(True)
-
-#----------------------------------------------------------
-# Plot the magnitude response of the filter.
-
-figure(2)
-clf()
-w, h = freqz(taps, worN=8000)
-plot((w/pi)*nyq_rate, absolute(h), linewidth=2)
-group_delay = -diff(unwrap(angle(h))) / diff(w)
-xlabel('Frequency (Hz)')
-ylabel('Gain')
-title('FIR Bandpass Filter Frequency Response')
-ylim(-0.05, 1.05)
-grid(True)
-
-# Upper inset plot.
-ax1 = axes([0.42, 0.6, .45, .25])
-plot((w/pi)*nyq_rate, absolute(h), linewidth=2)
-xlim(8.0,16.0)
-ylim(0.9, 1.1)
-grid(True)
-
-# Lower inset plot
-ax2 = axes([0.42, 0.25, .45, .25])
-plot((w/pi)*nyq_rate, absolute(h), linewidth=2)
-xlim(17.0, 25.0)
-ylim(0.0, 0.0025)
-grid(True)
-
-#----------------------------------------------------------
-# Plot the test signal and filtered output.
-
-
-# The phase delay of the filtered signal.
-delay = 0.5 * (N-1) / sample_rate
-
-figure(3)
-# Plot the test signal.
-plot(t, x)
-
-# Plot the filtered signal, shifted to compensate for 
-# the phase delay.
-
-plot(t-delay, filtered_x, 'r-')
-
-# Plot just the "good" part of the filtered signal. 
-# The first N-1 samples are "corrupted" by the
-# initial conditions.
-plot(t[N-1:]-delay, filtered_x[N-1:], 'g', linewidth=4)
-
-xlabel('t')
-title('Signal + noise and filtered ouput of FIR BPF')
-grid(True)
-
-show()
+test()    

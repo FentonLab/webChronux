@@ -5,8 +5,55 @@ import sys
 import traceback
 from scipy.io import loadmat
 import math
-#from scipy.signal import kaiser, group_delay, hilbert, angle
+from scipy.signal import firwin, lfilter
 import matplotlib.pyplot as plt
+import pandas as pd
+
+def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
+
+        '''
+        '''
+        
+        #normalize
+        if max(eeg) != 0:
+                eeg = np.array(eeg)/max(eeg)
+              
+        #filter HF
+        
+        
+        h = firwin(lenHF, freqHF/(eegFS/2), window = "hamming")  
+        h = [-1*a for a in h]
+        midPoint = math.floor(lenHF/2)
+        h[midPoint] = h[midPoint] + 1
+        print (h)
+        #h = firwin(lenHF,freqHF/(eegFS/2),'high')
+        sF = lfilter(h,1,eeg)
+        print (len(sF))
+        print (len(sF[midPoint:]))
+
+        sF = list(sF[midPoint:]) + [0]*(midPoint)
+        
+        print ( sF[:20])
+                
+        ###get variance
+        #sf = pd.Series(sF).olling_stdr(winLenVarHF).std()
+        rstd = pd.rolling_std(pd.Series(sF), window = int(winLenVarHF))
+        rvar = [x*x for x in rstd]
+        print ( rvar ) 
+        
+        #square
+        sF = np.square(sF)
+                
+        #smooth
+        h = (1/int(winLenSmoothHF)) * np.ones(int(winLenSmoothHF))
+        sF = lfilter(h,1,sF)
+        midPoint = math.floor(winLenSmoothHF/2)
+        sF = list(sF[midPoint:]) + [0]*(midPoint)
+                
+        #1=good signal
+        signalOK = [x for x in sF if x < thHF ]
+        print ( signalOK)
+
 
 def getNoiseSat(eeg,maxLengthCrossing):
     
@@ -20,61 +67,82 @@ def getNoiseSat(eeg,maxLengthCrossing):
         #get signal difference
         dif = np.diff(eeg)
 
-        print ( " dif = " + str(dif[:10]) )
+        #print ( " dif = " + str(dif[:10]) )
 
         k = [1 if x ==0 else 0 for x in dif]
         
         #print (" k " + str(k))
         #add first sample (diff takes one sample out)
         k = [k[0]] + k
-        print (" k " + str(k[:30]))        
-        ##skip extremely short saturations (1 value is 0), find 010
+        #print (" k " + str(k[:30]))        
+        #skip extremely short saturations (1 value is 0), find 010
+        
         k[0] = 0
         k[-1] = 0
 
         kUP = [i for i, x in enumerate(k) if x == 1 and k[i-1] == 0 ]
-        #kUP = kUP + 1;
+        kUP = np.array(kUP) + 1
         kDOWN = [i for i, x in enumerate(k) if x == 0 and k[i-1] == 1 ]
 
-        #d = kDOWN-kUP
-        #kd = find(d < 2) # allow two samples being same
-        #for i in range (len(kd)):
-            #ind = kd(i)
-            #k(kUP(ind):kDOWN(ind)) = 0
+        d = kDOWN-kUP
+
+        print ( d[:20])   
+        kd = [ i for i,x in enumerate(k) if x < 2 ]
+        #print ( kd[:20])   
+
+        for i, x in enumerate ( kd ):
+                #print ( str(i) + " : " + str(len(k)) ) 
+                #print (kUP[i])
+                #print (kDOWN[i])
+                print ( str(i) + " : " + str(len(kUP)) + " : " + str(len(kDOWN) ) ) 
+                if i >= len(kUP) or i >= len(kDOWN):
+                        break
+                k[kUP[i]:kDOWN[i]] = [0]*(kDOWN[i] - kUP[i])
+            
+        print ( k[:20] ) 
         
-        #k = ~k
+        k = 1- np.array(k)
+        print ( str(len(k) ) ) 
 
         #overshoots allowed
-        #if maxLengthCrossing != 0:                
-            ##first find overshoots and allow short ones
-            #k(1) = 1; k(end) = 1
-            #kDOWN = find(k(1:end-1) == 1 & k(2:end) == 0)
-            #kDOWN = kDOWN + 1
-            #kUP = find(k(1:end-1) == 0 & k(2:end) == 1)
-            #d = kUP - kDOWN + 1 # %length of overshoots
-            #kd = d > maxLengthCrossing # %only select large crossings
-            #kDOWN = kDOWN(kd)
-            #kUP = kUP(kd)
+        if maxLengthCrossing != 0:                
+                #first find overshoots and allow short ones
+                k[0] = 1
+                k[-1] = 1
+    
+                k[0] = 0
+                k[-1] = 0
         
-            ##create new series and find long enough windows
-            #k = ones(1,length(k))
-            #for i in range ( len(kDOWN)):
-                #st = kDOWN(i)
-                #ed = kUP(i)
-                #k(st:ed) = 0
+                kDOWN = [i for i, x in enumerate(k) if x == 1 and k[i-1] == 0 ]
+                kDOWN = np.array(kDOWN) + 1
                 
-        #signalOK = logical(k);
+                kUP = [i for i, x in enumerate(k) if x == 0 and k[i-1] == 1 ]
+        
+                d = kUP-kDOWN
+                
+                kd = [x for x in d if x > maxLengthCrossing] # %only select large crossings
+                kDOWN = [ kDOWN[i] for i,x in enumerate(kd) if x == 1 ] 
+                kUP = [ kUP[i] for i,x in enumerate(kd) if x == 1 ] 
+        
+                #create new series and find long enough windows
+                k = []
+                for i,x in enumerate(kDOWN):
+                                    
+                        if i >= len(kUP) or i >= len(kDOWN):
+                                break
+                        k[kUP[i]:kDOWN[i]] = [0]*(kDOWN[i] - kUP[i])
+                
+        signalOK = np.array(k)
 
     except:
         traceback.print_exc(file=sys.stdout)    
         
-    return       
+    return signalOK      
 
 def getArtifacts():
     
     '''
-    compute phase lag variance
-    PLV plotted at the end
+
     Original Matlab code by Dino Dvorak 2012 dino@indus3.net
     Python version by Siddhartha Mitra 2017 mitra.siddhartha@gmail.com
     Input: 
@@ -92,7 +160,7 @@ def getArtifacts():
         
         doSaturation = 1 # DO saturation test (set to 1)
         doSmallSig = 1 # DO slow signal test
-        doHF = 0 # DO high frequency artifact test
+        doHF = 1 # DO high frequency artifact test
         
         eegFS = 250 # sampling rate
         
@@ -116,7 +184,7 @@ def getArtifacts():
         
         # high frequency
         lenHF = 50 # %length of HF filter [samples]
-        freqHF = 250 # %frequency of HF filter [Hz]
+        freqHF = 100 # %frequency of HF filter [Hz]
         winLenVarHF = 0.1*eegFS # %variance window [samples]
         winLenSmoothHF = 0.2*eegFS # %smoothing window after HF [samples]
         thHF = 1e-5 # %threshold for HF signal - INCREASE for LOWER sensitivity
@@ -130,22 +198,22 @@ def getArtifacts():
         sigHF = []
         
         #get saturations (non-changing signal)
-        if doSaturation == 1:
-            sigSat = getNoiseSat(eeg,maxLengthCrossing)
+        #if doSaturation == 1:
+            #sigSat = getNoiseSat(eeg,maxLengthCrossing)
         
-        ## get HF noise
-        #if doHF == 1:
-            #sigHF = GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF)
+        # get HF noise
+        if doHF == 1:
+            sigHF = GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF)
         
         # merge all three signals
         
-        k = []
+        #k = []
         
         #if doSaturation == 1:
-            #k = k & sigSat
+            #k = [x for x,y in zip(k, sigSat) if y == 1] 
         
         #if doHF == 1:
-            #k = k & sigHF
+            #k = [x for x,y in zip(k, sigHF) if y == 1] 
 
         # compute windows
         

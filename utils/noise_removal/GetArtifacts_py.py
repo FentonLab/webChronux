@@ -5,7 +5,7 @@ import sys
 import traceback
 from scipy.io import loadmat
 import math
-from scipy.signal import firwin, lfilter
+from scipy.signal import firwin,firwin2,lfilter, kaiser
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -19,27 +19,35 @@ def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
                 eeg = np.array(eeg)/max(eeg)
               
         #filter HF
-        
-        
-        h = firwin(lenHF, freqHF/(eegFS/2), window = "hamming")  
+        #window = kaiser(51, beta=14)
+        winLen = lenHF
+        # to be in conformance with MATLAB ( check documentation of fir1 in MATLAB, it automatically adds 1 for even sized windows)
+        if lenHF % 2 ==0:
+                winLen = lenHF + 1
+        h = firwin(winLen, freqHF/(eegFS/2), pass_zero=False)  
+        h = np.array(h)* 1.0/sum(h)
+        print (h[19:39])
+        plt.plot(h)
+        plt.show()
         h = [-1*a for a in h]
+
         midPoint = math.floor(lenHF/2)
         h[midPoint] = h[midPoint] + 1
         print (h)
         #h = firwin(lenHF,freqHF/(eegFS/2),'high')
         sF = lfilter(h,1,eeg)
-        print (len(sF))
-        print (len(sF[midPoint:]))
+        #print (len(sF))
+        #print (len(sF[midPoint:]))
 
         sF = list(sF[midPoint:]) + [0]*(midPoint)
         
-        print ( sF[:20])
+        #print ( sF[:20])
                 
         ###get variance
         #sf = pd.Series(sF).olling_stdr(winLenVarHF).std()
         rstd = pd.rolling_std(pd.Series(sF), window = int(winLenVarHF))
         rvar = [x*x for x in rstd]
-        print ( rvar ) 
+        #print ( rvar ) 
         
         #square
         sF = np.square(sF)
@@ -52,7 +60,7 @@ def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
                 
         #1=good signal
         signalOK = [x for x in sF if x < thHF ]
-        print ( signalOK)
+        #print ( signalOK)
 
 
 def getNoiseSat(eeg,maxLengthCrossing):

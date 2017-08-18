@@ -1,11 +1,11 @@
 clear; close all; clc;
 
-%load('EEG181.mat');
+load('EEG181.mat');
 
 eegFS = 250;
 
-%eeg = eegData(15,50*eegFS:80*eegFS);
-%eeg = eeg-mean(eeg);
+eeg = eegData(15,50*eegFS:80*eegFS);
+eeg = eeg-mean(eeg);
 
 %edges for phase
 edges = linspace(-pi,pi,21);
@@ -13,7 +13,7 @@ edges = linspace(-pi,pi,21);
 %eegFS = 2000; %sampling rate
 %winLen = length(eeg); %window length
 
-x = linspace(0,100,1000);
+x = linspace(0,200,5000);
 
 s1 = sin( x * pi / 180 )
 
@@ -24,14 +24,14 @@ s2 = s1.*s2
 %print ( s2)
 s3 = s1 + s2 
 
-eeg = s3
-figure(1);
-hold;
-plot(s1);
-
-plot(s2);
-plot(s3);
-hold;
+%eeg = s3
+% figure(1);
+% hold;
+% plot(s1);
+% 
+% plot(s2);
+% plot(s3);
+% hold;
 
 winLen = length(eeg)
 

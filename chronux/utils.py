@@ -12,43 +12,63 @@ from django.conf import settings
 import pyedflib
 
 # get frequency grid
-def getGridIndices(analysisObj):
+def getGridIndices(lowerFrequency, upperFrequency, paddedNumDataPoints, samplingFrequency):
 
   try:
 
-    if analysisObj.upperFrequency and analysisObj.lowerFrequency:
+      frequencyResolution = float ( samplingFrequency ) / float ( paddedNumDataPoints )
+      
+      gridValues = np.arange ( 0, samplingFrequency , frequencyResolution )
+      
+      gridValues = gridValues[ :paddedNumDataPoints ]
 
-        paddedNumDataPoints = int ( pow ( 2, ceil ( np.log2 ( analysisObj.numDataPoints ) ) + analysisObj.padding ) )
+      gridIndices = [index for index, x in enumerate (gridValues) if x>= lowerFrequency and x<= upperFrequency ]
 
-        #print ( " paddedNumDataPoints = " + str(paddedNumDataPoints))
-
-        frequencyResolution = float ( analysisObj.samplingFrequency ) / float ( paddedNumDataPoints )
-        
-        gridValues = np.arange ( 0, paddedNumDataPoints , frequencyResolution )
-
-        #print ( " frequencyResolution = " + str(frequencyResolution))
-        
-        #print ( " gridValues = " + str(gridValues))
-        
-        gridIndices = np.where ( (gridValues >= analysisObj.lowerFrequency ) & (gridValues <= analysisObj.upperFrequency ) )
-
-        #print (" gridIndices " + str(gridIndices))
-
-        upperFrequencyGrid = 0
-        lowerFrequencyGrid = 0
-
-        if len( gridIndices ) > 0:
-
-          upperFrequencyGrid = gridIndices[0] [len(gridIndices[0]) -1]
-
-          if int(gridIndices [0][0]) > 0:
-
-              lowerFrequencyGrid = int(gridIndices [0][0])
+      gridValues = [x for index, x in enumerate (gridValues) if x>= lowerFrequency and x<= upperFrequency ]
 
   except:
     traceback.print_exc(file=sys.stdout)
-  #print ( " grid indices = " + str(gridIndices))
-  return int(lowerFrequencyGrid), int(upperFrequencyGrid) , gridIndices
+
+  #return gridValues , gridIndices
+
+## get frequency grid
+#def getGridIndices(analysisObj):
+
+  #try:
+
+    #if analysisObj.upperFrequency and analysisObj.lowerFrequency:
+
+        #paddedNumDataPoints = int ( pow ( 2, ceil ( np.log2 ( analysisObj.numDataPoints ) ) + analysisObj.padding ) )
+
+        ##print ( " paddedNumDataPoints = " + str(paddedNumDataPoints))
+
+        #frequencyResolution = float ( analysisObj.samplingFrequency ) / float ( paddedNumDataPoints )
+        
+        #gridValues = np.arange ( 0, paddedNumDataPoints , frequencyResolution )
+
+        ##print ( " frequencyResolution = " + str(frequencyResolution))
+        
+        ##print ( " gridValues = " + str(gridValues))
+        
+        #gridIndices = np.where ( (gridValues >= analysisObj.lowerFrequency ) & (gridValues <= analysisObj.upperFrequency ) )
+
+        ##print (" gridIndices " + str(gridIndices))
+
+        #upperFrequencyGrid = 0
+        #lowerFrequencyGrid = 0
+
+        #if len( gridIndices ) > 0:
+
+          #upperFrequencyGrid = gridIndices[0] [len(gridIndices[0]) -1]
+
+          #if int(gridIndices [0][0]) > 0:
+
+              #lowerFrequencyGrid = int(gridIndices [0][0])
+
+  #except:
+    #traceback.print_exc(file=sys.stdout)
+  ##print ( " grid indices = " + str(gridIndices))
+  #return int(lowerFrequencyGrid), int(upperFrequencyGrid) , gridIndices
 
 # 
 def analyzeEDFData(analysisObj):

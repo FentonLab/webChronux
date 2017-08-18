@@ -117,6 +117,18 @@ def test():
         # edges for phase
         edges = np.linspace(-math.pi,math.pi,21) 
         
+        x = np.linspace(0,200,5000);
+        
+        s1 = np.sin( x * pi / 180 )
+        
+        s2 = np.sin( x * pi / 18 )
+        
+        s2 = np.array ( [x*y for x,y in zip(s1,s2) ] ) 
+        
+        s3 = s1 + s2 
+        
+        eeg = s3
+        
         #edges = np.array(list(edges).append(math.pi))
         
         lcut = 9.0 
@@ -141,9 +153,14 @@ def test():
         
         # The cutoff frequency of the filter.
         cutoff_hz = lcut
+
+        winLen = N
+        # to be in conformance with MATLAB ( check documentation of fir1 in MATLAB, it automatically adds 1 for even sized windows)
+        if N % 2 ==0:
+                winLen = N + 1        
         
         # Use firwin with a Kaiser window to create a lowpass FIR filter.
-        hpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))    
+        hpftaps = firwin(winLen, cutoff_hz/nyq, window=('kaiser', beta), pass_zero=False)    
         
         #print (hpftaps[:10])
         
@@ -163,7 +180,8 @@ def test():
         # Now calculate the tap weights for a lowpass filter at say 15hz
         
         cutoff_hz = hcut
-        lpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))
+
+        lpftaps = firwin(winLen, cutoff_hz/nyq, window=('kaiser', beta), pass_zero=False)
         
         # Subtract 1 from lpf centre tap for gain adjust for hpf + lpf
         lpftaps[midPoint] = lpftaps[midPoint] - 1

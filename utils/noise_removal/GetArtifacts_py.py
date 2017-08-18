@@ -9,6 +9,52 @@ from scipy.signal import firwin,firwin2,lfilter, kaiser
 import matplotlib.pyplot as plt
 import pandas as pd
 
+def getWindows(k,minLen,winSafe):
+
+    try:
+
+        #%for every island of 0s extend it before and after (winSafe)
+        if winSafe != 0:
+            k[0] = 1 
+            k[end] = 1
+            kDOWN = find(k(1:end-1) == 1 & k(2:end) == 0); 
+            kDOWN = kDOWN + 1;
+            kUP = find(k(1:end-1) == 0 & k(2:end) == 1); 
+            for i in range ( len(kUP)):
+                st = kDOWN(i)-winSafe
+                if st < 1:
+                    st=1
+                ed = kUP(i)+winSafe
+                if ed > length(k):
+                    ed = length(k)
+                k(st:ed) = 0
+        
+        #%allow only these which have enough length (minLen)
+        if minLen != 0:
+            #find islands of 1s
+            k[0] = 0
+            k[end] = 0
+            kUP = find(k(1:end-1) == 0 & k(2:end) == 1)
+            kUP = kUP + 1
+            kDOWN = find(k(1:end-1) == 1 & k(2:end) == 0)
+            d = kDOWN - kUP # %length of overshoots
+            kd = d > minLen # %only select large crossings
+            kUP = kUP(kd)
+            kDOWN = kDOWN(kd)
+            
+            #redo boolean vector k
+            k = zeros(1,length(k))
+            for i in range ( len(kUP)):
+                k(kUP(i):kDOWN(i)) = 1
+
+        windows = cat(2,kUP',kDOWN')
+        signalOK = logical(k)
+
+    except:
+        traceback.print_exc(file=sys.stdout)            
+
+    return windows, signalOK
+
 def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
 
         '''
@@ -25,7 +71,10 @@ def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
         if lenHF % 2 ==0:
                 winLen = lenHF + 1
         h = firwin(winLen, freqHF/(eegFS/2), pass_zero=False)  
-        h = np.array(h)* 1.0/sum(h)
+        #h = np.array(h)* 1.0/sum(h)
+        #h = np.array(h)*1.0/float(max(h)-min(h))
+        #h = np.array(h)*1.0/25000.0
+
         print (h[19:39])
         plt.plot(h)
         plt.show()
@@ -33,7 +82,7 @@ def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
 
         midPoint = math.floor(lenHF/2)
         h[midPoint] = h[midPoint] + 1
-        print (h)
+        #print (h)
         #h = firwin(lenHF,freqHF/(eegFS/2),'high')
         sF = lfilter(h,1,eeg)
         #print (len(sF))
@@ -47,7 +96,7 @@ def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
         #sf = pd.Series(sF).olling_stdr(winLenVarHF).std()
         rstd = pd.rolling_std(pd.Series(sF), window = int(winLenVarHF))
         rvar = [x*x for x in rstd]
-        #print ( rvar ) 
+        print ( rvar ) 
         
         #square
         sF = np.square(sF)
@@ -59,9 +108,11 @@ def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
         sF = list(sF[midPoint:]) + [0]*(midPoint)
                 
         #1=good signal
-        signalOK = [x for x in sF if x < thHF ]
-        #print ( signalOK)
-
+        print (sF)
+        signalOK = [1 if x < thHF else 0 for x in sF  ]
+        print ( signalOK)
+        #plt.plot(signalOK)
+        #plt.show()
 
 def getNoiseSat(eeg,maxLengthCrossing):
     
@@ -135,7 +186,7 @@ def getNoiseSat(eeg,maxLengthCrossing):
                 #create new series and find long enough windows
                 k = []
                 for i,x in enumerate(kDOWN):
-                                    
+                        k[kUP[i]:kDOWN[i]] == '1'            
                         if i >= len(kUP) or i >= len(kDOWN):
                                 break
                         k[kUP[i]:kDOWN[i]] = [0]*(kDOWN[i] - kUP[i])
@@ -215,46 +266,35 @@ def getArtifacts():
         
         # merge all three signals
         
-        #k = []
+        k = []
         
-        #if doSaturation == 1:
-            #k = [x for x,y in zip(k, sigSat) if y == 1] 
+        if doSaturation == 1:
+                k = [x for x,y in zip(k, sigSat) if y == 1] 
         
-        #if doHF == 1:
-            #k = [x for x,y in zip(k, sigHF) if y == 1] 
-
+        if doHF == 1:
+                k = [x for x,y in zip(k, sigHF) if y == 1] 
+            
         # compute windows
         
-        #[sigOKCH, winOKCH] = GetWindows(k,minLen,winSafe)
+        [sigOKCH, winOKCH] = GetWindows(k,minLen,winSafe)
         
-        ##pltsubplot(5,1,1);
-        #plt.plot(eeg,'k');
-        #plt.title('eeg');
-        ##axis tight;
+        plt.figure(1)
+        plt.subplot(411)
+        plt.plot(eeg,'k');
+        plt.title('eeg');
         
-        ##subplot(5,1,2);
-        #plt.plot(sigSat,'r');
-        #plt.title('saturations');
-        ##axis tight;
+        plt.subplot(412);
+        plt.plot(sigSat,'r');
+        plt.title('saturations');
         
-        ##subplot(5,1,4);
-        #plt.plot(sigHF,'r');
-        #plt.title('hf signal');
-        ##axis tight;
+        plt.subplot(413);
+        plt.plot(sigHF,'r');
+        plt.title('hf signal');
         
-        ##subplot(5,1,5); hold on;
-        #plt.plot(k,'k*');
-        #plt.plot(sigOKCH,'r');
-        #plt.title('good signal');
-        ##axis tight;
-        ##%}
-        
-        ##store data
-        #signalOK[chI] = sigOKCH
-        #windowsOK[chI] = winOKCH
-        
-        #save data
-        #save([drOut files(fI).name], 'signalOK','windowsOK');
+        plt.subplot(414);
+        plt.plot(k,'k*');
+        plt.plot(sigOKCH,'r');
+        plt.title('good signal');
 
     except:
         traceback.print_exc(file=sys.stdout)    

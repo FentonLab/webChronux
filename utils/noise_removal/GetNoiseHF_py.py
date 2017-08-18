@@ -13,17 +13,7 @@ import matplotlib.pyplot as plt
 
 def GetNoiseHF(eeg,eegFS,lenHF,freqHF,winLenVarHF,winLenSmoothHF,thHF):
 
-        #%{
-        #%testing:
-        #load('data samples/sat1.mat');
-        #eeg = x;
-        #lenHF = 50;               
-        #freqHF = 250;             
-        #winLenVarHF = eegFS/10;   
-        #winLenSmoothHF = eegFS/5; 
-        #thHF = 1e-6;              
-        #%}
-        
+
         #normalize
         eeg = eeg/max(eeg)
               

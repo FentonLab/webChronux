@@ -39,16 +39,16 @@ def getMI(amp, phase, edges):
         for hi in range ( len(edges) - 1 ):
             
             k = [ 1 if x >= edges[hi] and x < edges[hi+1] else 0 for x in phase]
-            #print ( " k = " + str(k) ) 
+            print ( " k = " + str(k) ) 
             
             if sum(k) > 0: # only if there are some values, otherwise keep zero
-                print (sum([x for i,x in enumerate(amp) if k[i] == 1 ]))
+                #print (sum([x for i,x in enumerate(amp) if k[i] == 1 ]))
                 
                 h.append( np.mean([x for i,x in enumerate(amp) if k[i] == 1 ])) # mean of amplitudes at that phase bin
             else:
                 h.append(0)
                 
-        #print ( " h = " + str(h) )
+        print ( " h0 = " + str(h) )
     
         ## fix last value
         #k = [x == y for x,y in zip ( phase, edges [end])] 
@@ -58,15 +58,15 @@ def getMI(amp, phase, edges):
         ## convert to probability
         h = h / sum(h)
                 
-        #print ( " h = " + str(h) )
+        print ( " h = " + str(h) )
         
         ## replace zeros by eps
         #k = h == 0
         #h[k] = eps
         
         ## calculate modulation index
-        Hp = -1 * sum( [x*np.log(x) for x in h]) # entropy of the histogram
-        #print ( " Hp = " + str(Hp) )
+        Hp = -1 * sum( [x*np.log(x) if x > 0 else 0 for x in h]) # entropy of the histogram
+        print ( " Hp = " + str(Hp) )
 
         D = np.log(len(h)) - Hp
         #print ( " D = " + str(D) )
@@ -100,11 +100,23 @@ def test():
                 
         eeg = eegData[14]
         
-        print ( eeg[:5])
+        #print ( eeg[:5])
         
         eeg = eeg[50 * eegFS - 1 : 80 * eegFS - 1 ]   
         
-        eeg = eeg - np.mean(eeg, axis = 0)         
+        eeg = eeg - np.mean(eeg, axis = 0) 
+        
+        x = np.linspace(0,200,5000);
+        
+        s1 = np.sin( x * pi / 180 )
+        
+        s2 = np.sin( x * pi / 18 )
+        
+        s2 = np.array ( [x*y for x,y in zip(s1,s2) ] ) 
+        
+        s3 = s1 + s2 
+        
+        eeg = s3        
         
         # edges for phase
         edges = np.linspace(-math.pi,math.pi,21) 
@@ -135,7 +147,7 @@ def test():
         cutoff_hz = lcut
         
         # Use firwin with a Kaiser window to create a lowpass FIR filter.
-        hpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))    
+        hpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta), pass_zero=False)    
         
         #print (hpftaps[:10])
         
@@ -155,7 +167,7 @@ def test():
         # Now calculate the tap weights for a lowpass filter at say 15hz
         
         cutoff_hz = hcut
-        lpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))
+        lpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta), pass_zero=False)
         
         # Subtract 1 from lpf centre tap for gain adjust for hpf + lpf
         lpftaps[midPoint] = lpftaps[midPoint] - 1
@@ -273,9 +285,10 @@ def test():
             
             MI = getMI(amp,ph,edges)
             MIs.append(MI)
+            print (" MI = " + str(MI))
             #break
         
-        print ( " MIs = " + str(MIs))
+        #print ( " MIs = " + str(MIs))
         plt.plot(fGamma,MIs)
         plt.show()
 

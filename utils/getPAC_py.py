@@ -80,9 +80,9 @@ def getPAC():
         
         # The cutoff frequency of the filter.
         cutoff_hz = 9.0
-        
+       
         # Use firwin with a Kaiser window to create a lowpass FIR filter.
-        hpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))
+        hpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta), pass_zero=False)
         
         #----------------------------------------------------------
         # now create the taps for a high pass filter.
@@ -100,7 +100,7 @@ def getPAC():
         # Now calculate the tap weights for a lowpass filter at say 15hz
         
         cutoff_hz = 13.0
-        lpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta))
+        lpftaps = firwin(N, cutoff_hz/nyq, window=('kaiser', beta), pass_zero=False)
         
         # Subtract 1 from lpf centre tap for gain adjust for hpf + lpf
         lpftaps[midPoint] = lpftaps[midPoint] - 1

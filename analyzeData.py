@@ -9,6 +9,9 @@ import os
 import traceback
 import mne
 from multitaper import *
+import scipy
+from scipy.io import savemat, loadmat
+SELECTED_CHANNELS = ['F7','T5', 'F3','P3', 'F4','P4', 'F8','T6', 'Fp1','O1', 'Fp2','O2']
 
 # get frequency grid
 def getGridIndices(lowerFrequency, upperFrequency, paddedNumDataPoints, samplingFrequency):
@@ -47,125 +50,142 @@ def analyzeEDFData(filePath):
     upperFrequency = 100
     lowerFrequency = 0
     timeBandWidth = 4
-    timeWindow = WINDOW_SIZE = 5 # time window in seconds
+    timeWindow = 5 # time window in seconds
     STEP_SIZE = 2 # in seconds
+    
     numDataPoints =  timeWindow * samplingFrequency
     stepSize = STEP_SIZE * samplingFrequency
-    padding = pad = 1
+    padding = pad = 0
   
-    winLen = WINDOW_SIZE * eegFS  
+    winLen = timeWindow * eegFS  
     paddedNumDataPoints = int ( pow ( 2, ceil ( np.log2 ( winLen ) ) + pad ) )
   
     numTapers = 2 * timeBandWidth -1
   
     [tapers, eigenValues] = dpss_windows(int(numDataPoints), float(timeBandWidth), int(numTapers) )
   
-    numTapers = len(tapers)
-    print ("numTapers="+ str(numTapers))
-    pad = 0
-    fpass = [0,100]
-    timeBandWidth = 4
+    #numTapers = len(tapers)
     numTapers = 9
+    print ("numTapers="+ str(numTapers))
+
+    fpass = [lowerFrequency,upperFrequency]
   
     gridValues, gridIndices = getGridIndices(fpass[0], fpass[1], paddedNumDataPoints, eegFS)
+    
+    dataMatrix = []
   
     #spectrumChannelSumData = [0] * ( upperFrequency - lowerFrequency + 1 )
-    spectrumChannelSumData = [0] * len(gridIndices)
+    spectrumChannelSumData = [0] * len(gridIndices) 
     
     for channelIndex in range(n):
   
       spectrogramData = []
   
       channelData = f.readSignal(channelIndex)
+      
+      channelLabel = signal_labels[channelIndex]
+      
+      # only process selected channels
+      if channelLabel not in SELECTED_CHANNELS:
+        continue
+      print ("for channel " + channelLabel)
   
       numWindows = int ( ( len ( channelData ) - numDataPoints + 1) / ( stepSize  ) )
   
       print ( " numWindows = " + str(numWindows) )
+      
+      #theta (4-7 Hz), alpha (9-13 Hz), beta (15-25 Hz) and gamma (30-50 Hz)       
+      thetaPowerSpectra = []
+      alphaPowerSpectra = []
+      betaPowerSpectra = []
+      gammaPowerSpectra = []
   
-      for windowNum in range ( numWindows ) :
+      #for windowNum in range ( numWindows ) :
   
-          beginWin = windowNum * samplingFrequency * STEP_SIZE
-          endWin = beginWin + numDataPoints
+          #beginWin = windowNum * samplingFrequency * STEP_SIZE
+          #endWin = beginWin + numDataPoints
+          
+          #print (" window num = " + str(windowNum) )
   
-          #print ( " beginWin = " + str(beginWin) + " endWin = " + str(endWin))
+          ##print ( " beginWin = " + str(beginWin) + " endWin = " + str(endWin))
   
-          windowData = channelData [ beginWin : endWin]
+          #windowData = channelData [ beginWin : endWin]
   
-          #print ( " windowData = " + str(windowData) )
+          ##print ( " windowData = " + str(windowData) )
   
-          if len(windowData) == 0:
+          #if len(windowData) == 0:
   
-            break
+            #break
   
-          for taperIndex, taper in enumerate ( tapers ) :
+          #for taperIndex, taper in enumerate ( tapers ) :
   
-            print (" taperIndex = " + str(taperIndex))
-            print (" tapers = " + str(tapers))
+            ##print (" taperIndex = " + str(taperIndex))
+            ##print (" tapers = " + str(tapers))
   
-            taperData = [float(a*b) for a,b in zip(windowData,taper)]
+            #taperData = [float(a)*float(b) for a,b in zip(windowData,taper)]
             
-            fftData = fft(taperData,paddedNumDataPoints)
+            #fftData = scipy.fftpack.fft(taperData,paddedNumDataPoints)
             
-            print ( " fftData before = " + str(fftData) ) 
+            ##print ( " fftData before = " + str(fftData) ) 
             
-            fftData = [fftData[x] for x in gridIndices]
+            #fftData = [fftData[x] for x in gridIndices]
+
+            #fftData = (1.0/float(eegFS) ) * np.array (fftData)
+             
+            #spectrumChannelData = np.array([log(abs(x*conj(x))) for x in fftData])
+  
+            ##spectrumChannelData = [ x for x in spectrumChannelData if x > lowerFrequency or x < upperFrequency ]
+            ##spectrumChannelData = spectrumChannelData[lowerFrequency:upperFrequency]
+
+            ##theta (4-7 Hz), alpha (9-13 Hz), beta (15-25 Hz) and gamma (30-50 Hz)       
+            ##thetaPowerSpectra = spectrumChannelData[4:7]
+            ##alphaPowerSpectra = []
+            ##betaPowerSpectra = []
+            ##gammaPowerSpectra = []
+
+            ##thetaPowerSpectra = spectrumChannelData[lowerFrequency:upperFrequency]
+            ##thetaPowerSpectra = spectrumChannelData[lowerFrequency:upperFrequency]
+            ##thetaPowerSpectra = spectrumChannelData[lowerFrequency:upperFrequency]
+
+            #spectrumChannelSumData = spectrumChannelSumData + array(spectrumChannelData)
             
-            #print ( " fftData after ^^^^^^^^^ = " + str(fftData) ) 
+            ##fftData2 = [fftData2[x] for x in gridIndices]
+            ##fftData2 = (1.0/float(eegFS) ) * np.array (fftData2)
+            ##crossSpectrumChannelData = np.array ([np.conj(x) * y for x,y in zip ( fftData1, fftData2) ])            
+            ##crossSpectrumChannelDataList.append(crossSpectrumChannelData)
+        
+        ##crossSpectrumChannelDataAvg = np.mean(crossSpectrumChannelDataList, axis = 0)                
   
-            spectrumChannelData = np.array([log(abs(x*conj(x))) for x in fftData])
+          #spectrumChannelAvgData = np.array( spectrumChannelSumData ) / numTapers
+          
+          ##spectrumChannelAvgData = np.mean( spectrumChannelSumData, axis = 0 ) 
   
-            spectrumChannelData = spectrumChannelData[lowerFrequency:upperFrequency]
+          #spectrogramData.append(list(spectrumChannelAvgData))
   
-            #print ( " padded num = " + str(paddedNumDataPoints) + " spectrum len = " + str(spectrumChannelData))
+          ##print (spectrogramData)
   
-            #spectrumChannelData = list(spectrumChannelData[gridIndices])
+          ##print (" for window = " + str(windowNum) + " spectrogramData = " + str(spectrogramData) )
   
-            spectrumChannelData = (1 / float(samplingFrequency) ) * np.array(spectrumChannelData)
-            #spectrumChannelData = spectrumChannelData[lowerFrequency:upperFrequency+1]
+          ##break
   
-            #print (spectrumChannelData)
-  
-            #print (" for taper = " + str(taperIndex ) + "  spectrumChannelData = " + str(spectrumChannelData) )
-            spectrumChannelSumData = spectrumChannelSumData + array(spectrumChannelData)
-  
-          spectrumChannelAvgData = np.array( spectrumChannelSumData ) / numTapers
-  
-          spectrogramData.append(list(spectrumChannelAvgData))
-  
-          #print (spectrogramData)
-  
-          #print (" for window = " + str(windowNum) + " spectrogramData = " + str(spectrogramData) )
-  
-          #break
-  
-      #np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
-      #print (spectrogramData)
-      print(np.shape(spectrogramData))
-      #np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
+      ##np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
+      ##print (spectrogramData)
+      #print(np.shape(spectrogramData))
+      
       #spectrumPSD = [float(sum(col))/len(col) for col in zip(*spectrogramData)]
       #spectrumPSD = np.array(spectrumPSD)/100
-      #np.savetxt("outdata/channel_spectrum_PSD_data" + str(channelIndex) + ".txt", spectrumPSD )
+      ##np.savetxt("outdata/channel_spectrum_PSD_data" + str(channelIndex) + ".txt", spectrumPSD )
   
-      #plt.plot(spectrumPSD.transpose())
-      #plt.savefig("outdata/channel_spectrum_psd_" + str(channelIndex) + ".png" )
-  
-      #plt.clf()
-  
-      plt.imshow(spectrogramData)
-      plt.savefig("outdata/channel_spectrogram_" + str(channelIndex) + ".png" )
-  
-      plt.show()
-  
-      #plt.clf()
-  
-      #S = imag(S12x);
-  
-      #WPLI
-       #outsum   = nansum(S,1) # compute the sum; this is 1 x size(2:end)
-       #outsumW  = nansum(abs(S),1) # normalization of the WPLI
-       #outssq   = nansum(S.^2,1)
-       #wpli     = (outsum.^2 - outssq)./(outsumW.^2 - outssq) # do the pairwise thing in a handy way
-
+      ##plt.plot(spectrumPSD.transpose())
+      ##plt.savefig("outdata/channel_spectrum_psd_" + str(channelIndex) + ".png" )
+      ##plt.clf()
+      
+      #plt.figure(1, figsize = (8.5,11))
+      #plt.imshow(np.array(spectrogramData))
+      ##plt.savefig("outdata/channel_spectrogram_" + str(channelIndex) + ".png" )
+      #plt.gca().invert_yaxis()
+      #plt.show()
+      ##plt.clf()
 
       break
 
@@ -173,5 +193,6 @@ def analyzeEDFData(filePath):
     traceback.print_exc(file=sys.stdout)
     return
 
-analyzeEDFData("/Users/smitra/self/andre/MIT-concussion/baseline257802_20161018_194838.edf")
+analyzeEDFData("/Users/smitra/self/andre/MIT-concussion/257802-post_season_20161206_142914.edf")
+#257807-_post-season_20161129_132254.edf
 print (" end 999 ")

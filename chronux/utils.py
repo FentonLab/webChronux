@@ -29,48 +29,8 @@ def getGridIndices(lowerFrequency, upperFrequency, paddedNumDataPoints, sampling
   except:
     traceback.print_exc(file=sys.stdout)
 
-  #return gridValues , gridIndices
+  return gridValues , gridIndices
 
-## get frequency grid
-#def getGridIndices(analysisObj):
-
-  #try:
-
-    #if analysisObj.upperFrequency and analysisObj.lowerFrequency:
-
-        #paddedNumDataPoints = int ( pow ( 2, ceil ( np.log2 ( analysisObj.numDataPoints ) ) + analysisObj.padding ) )
-
-        ##print ( " paddedNumDataPoints = " + str(paddedNumDataPoints))
-
-        #frequencyResolution = float ( analysisObj.samplingFrequency ) / float ( paddedNumDataPoints )
-        
-        #gridValues = np.arange ( 0, paddedNumDataPoints , frequencyResolution )
-
-        ##print ( " frequencyResolution = " + str(frequencyResolution))
-        
-        ##print ( " gridValues = " + str(gridValues))
-        
-        #gridIndices = np.where ( (gridValues >= analysisObj.lowerFrequency ) & (gridValues <= analysisObj.upperFrequency ) )
-
-        ##print (" gridIndices " + str(gridIndices))
-
-        #upperFrequencyGrid = 0
-        #lowerFrequencyGrid = 0
-
-        #if len( gridIndices ) > 0:
-
-          #upperFrequencyGrid = gridIndices[0] [len(gridIndices[0]) -1]
-
-          #if int(gridIndices [0][0]) > 0:
-
-              #lowerFrequencyGrid = int(gridIndices [0][0])
-
-  #except:
-    #traceback.print_exc(file=sys.stdout)
-  ##print ( " grid indices = " + str(gridIndices))
-  #return int(lowerFrequencyGrid), int(upperFrequencyGrid) , gridIndices
-
-# 
 def analyzeEDFData(analysisObj):
   
   try:
@@ -90,18 +50,16 @@ def analyzeEDFData(analysisObj):
       endWin = 0
     
       numTapers = 2 * analysisObj.bandWidth -1
-      
-      #print (" numDataPoints =" + str(int(analysisObj.numDataPoints)) + " bandWidth = " + str(float(analysisObj.bandWidth)) + " numtapers= " + str(int(numTapers)))
     
       [tapers, eigenValues] = dpss_windows(int(analysisObj.numDataPoints), float(analysisObj.bandWidth), int(numTapers) )
     
       spectrumChannelSumData = [0] * (analysisObj.upperFrequency - analysisObj.lowerFrequency + 1 )
     
       numTapers = len(tapers)
-    
-      lowerFrequencyGrid, upperFrequencyGrid, gridIndices = getGridIndices (analysisObj)
       
       paddedNumDataPoints = int ( pow ( 2, ceil ( np.log2 ( analysisObj.numDataPoints ) ) + analysisObj.padding ) )
+    
+      gridValues, gridIndices = getGridIndices(analysisObj.lowerFrequency, analysisObj.upperFrequency, paddedNumDataPoints, analysisObj.samplingFrequency)
     
       for channelIndex in range(n):
         
@@ -112,9 +70,8 @@ def analyzeEDFData(analysisObj):
    
         channelData = f.readSignal(channelIndex)
    
-        #numWindows = round ( len(channelData) / numDataPoints ) + 1
-   
-        numWindows = int ( ( len ( channelData ) - analysisObj.numDataPoints + 1) / ( analysisObj.stepSize  ) )
+        #numWindows = int ( ( len ( channelData ) - analysisObj.numDataPoints + 1) / ( analysisObj.stepSize  ) )
+        numWindows = int ( ( len ( channelData ) ) / float( analysisObj.numDataPoints ) )
    
         #print ( " numWindows = " + str(numWindows) )
    
@@ -146,7 +103,7 @@ def analyzeEDFData(analysisObj):
               spectrumChannelData = list(spectrumChannelData[gridIndices])
    
               spectrumChannelData = (1 / float(analysisObj.samplingFrequency) ) * np.array(spectrumChannelData)
-              spectrumChannelData = spectrumChannelData[analysisObj.lowerFrequency : analysisObj.upperFrequency+1]
+              #spectrumChannelData = spectrumChannelData[analysisObj.lowerFrequency : analysisObj.upperFrequency+1]
    
               #print (spectrumChannelData)
    

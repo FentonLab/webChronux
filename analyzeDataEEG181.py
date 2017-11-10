@@ -38,11 +38,11 @@ def analyzeEDFData(filePath):
   try:
 
     print ( " in analyze data ")
-    data = loadmat("/Users/smitra/projects/webChronux/utils/EEG181.mat")["eegData"]
-    #f = pyedflib.EdfReader(filePath)
-    #n = f.signals_in_file
-    #signal_labels = f.getSignalLabels()
-    numChannels = 16
+    #data = loadmat("/Users/smitra/projects/webChronux/utils/EEG181.mat")["eegData"]
+    filePath = "/Users/smitra/self/andre/MIT-concussion/257802-post_season_20161206_142914.edf"
+    f = pyedflib.EdfReader(filePath)
+    signal_labels = f.getSignalLabels()
+    numChannels = f.signals_in_file
   
     beginWin = 0
     endWin = 0
@@ -82,15 +82,15 @@ def analyzeEDFData(filePath):
   
       spectrogramData = []
   
-      channelData = data[channelIndex]
+      #channelData = data[channelIndex]
   
-      #channelData = f.readSignal(channelIndex)
+      channelData = f.readSignal(channelIndex)
       
-      #channelLabel = signal_labels[channelIndex]
+      channelLabel = signal_labels[channelIndex]
       
       # only process selected channels
-      #if channelLabel not in SELECTED_CHANNELS:
-        #continue
+      if channelLabel not in SELECTED_CHANNELS:
+        continue
       #print ("for channel " + channelLabel)
   
       numWindows = int ( ( len ( channelData ) - numDataPoints + 1) / ( stepSize  ) )
@@ -165,30 +165,33 @@ def analyzeEDFData(filePath):
           #spectrumChannelAvgData = np.mean( spectrumChannelSumData, axis = 0 ) 
   
           spectrogramData.append(list(spectrumChannelAvgData))
+          
+          plt.plot(spectrumChannelAvgData)
+          plt.show()
   
           #print (spectrogramData)
   
           #print (" for window = " + str(windowNum) + " spectrogramData = " + str(spectrogramData) )
   
-          #break
+          break
   
       #np.savetxt("outdata/channel_spectrogram_data" + str(channelIndex) + ".txt", spectrogramData )
       #print (spectrogramData)
-      print(np.shape(spectrogramData))
+      #print(np.shape(spectrogramData))
       
-      spectrumPSD = [float(sum(col))/len(col) for col in zip(*spectrogramData)]
-      spectrumPSD = np.array(spectrumPSD)/100
+      #spectrumPSD = [float(sum(col))/len(col) for col in zip(*spectrogramData)]
+      #spectrumPSD = np.array(spectrumPSD)/100
       #np.savetxt("outdata/channel_spectrum_PSD_data" + str(channelIndex) + ".txt", spectrumPSD )
   
       #plt.plot(spectrumPSD.transpose())
       #plt.savefig("outdata/channel_spectrum_psd_" + str(channelIndex) + ".png" )
       #plt.clf()
       
-      plt.figure(1, figsize = (8.5,11))
-      plt.imshow(np.array(spectrogramData))
+      #plt.figure(1, figsize = (8.5,11))
+      #plt.imshow(np.array(spectrogramData))
       #plt.savefig("outdata/channel_spectrogram_" + str(channelIndex) + ".png" )
-      plt.gca().invert_yaxis()
-      plt.show()
+      #plt.gca().invert_yaxis()
+      #plt.show()
       #plt.clf()
 
       break
